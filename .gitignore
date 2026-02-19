@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Stale tsc artifacts in source dirs
+app/src/**/*.js
+app/src/**/*.d.ts
+
+# Vite cache
+.vite/
+
+# Environment variables (contains API keys)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE files
+.vscode/
+.idea/
+.trae/
+*.swp
+*.swo
+*~
+
+# Logs & PID
+*.log
+*.pid
+
+# AI assistant context (local only)
+.claude/
+CLAUDE.md
+
+# Spec workflow (local only)
+.spec-workflow/
+
+# CLI output
+cli/output/
+
+# Temp & cache
+.tmp/
+.bench/
+output/

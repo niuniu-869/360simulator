@@ -1,0 +1,580 @@
+/* 街景视角专用 CSS 动画 */
+
+/* ============ 粒子动画 ============ */
+
+@keyframes sv-rain-fall {
+  0% { transform: translateY(-20px); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { transform: translateY(80px); opacity: 0; }
+}
+
+@keyframes sv-snow-fall {
+  0% { transform: translateY(-10px) translateX(0); opacity: 0; }
+  10% { opacity: 0.9; }
+  90% { opacity: 0.9; }
+  100% { transform: translateY(80px) translateX(20px); opacity: 0; }
+}
+
+@keyframes sv-petal-fall {
+  0% { transform: translateY(-10px) rotate(0deg) translateX(0); opacity: 0; }
+  10% { opacity: 0.8; }
+  50% { transform: translateY(35px) rotate(180deg) translateX(15px); }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(80px) rotate(360deg) translateX(5px); opacity: 0; }
+}
+
+@keyframes sv-leaf-fall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.9; }
+  30% { transform: translateY(20px) rotate(60deg) translateX(15px); }
+  60% { transform: translateY(45px) rotate(120deg) translateX(-5px); }
+  90% { opacity: 0.9; }
+  100% { transform: translateY(80px) rotate(180deg) translateX(10px); opacity: 0; }
+}
+
+@keyframes sv-firefly {
+  0%, 100% { opacity: 0.15; transform: translate(0, 0); }
+  25% { opacity: 0.9; transform: translate(5px, -3px); }
+  50% { opacity: 0.3; transform: translate(-3px, 5px); }
+  75% { opacity: 1; transform: translate(4px, 2px); }
+}
+
+@keyframes sv-mist-drift {
+  0% { transform: translateX(-100%); opacity: 0; }
+  15% { opacity: 0.25; }
+  85% { opacity: 0.25; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes sv-heat-wave {
+  0%, 100% { transform: scaleY(1) translateY(0); opacity: 0.15; }
+  50% { transform: scaleY(1.03) translateY(-2px); opacity: 0.25; }
+}
+
+@keyframes sv-frost-twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+}
+
+/* ============ 行人动画 ============ */
+
+@keyframes sv-walk-right {
+  0% { transform: translateX(-50px); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(320px); opacity: 0; }
+}
+
+@keyframes sv-walk-left {
+  0% { transform: translateX(320px); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(-50px); opacity: 0; }
+}
+
+@keyframes sv-enter-store {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  60% { transform: translate(0, -12px) scale(0.9); opacity: 0.6; }
+  100% { transform: translate(0, -20px) scale(0.7); opacity: 0; }
+}
+
+/* ============ 外卖骑手 ============ */
+
+@keyframes sv-delivery-out {
+  0% { transform: translateX(0) scale(1); opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateX(140px) scale(0.8); opacity: 0; }
+}
+
+/* ============ 招牌呼吸灯（高级装修） ============ */
+
+@keyframes sv-sign-glow {
+  0%, 100% { text-shadow: 0 0 4px currentColor; }
+  50% { text-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
+}
+
+.sv-sign-glow {
+  animation: sv-sign-glow 3s ease-in-out infinite;
+}
+
+/* ============ 圆环脉冲（hover） ============ */
+
+@keyframes sv-ring-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ============ 粒子工具类 ============ */
+
+.sv-particle-rain {
+  animation: sv-rain-fall linear infinite;
+}
+
+.sv-particle-snow {
+  animation: sv-snow-fall linear infinite;
+}
+
+.sv-particle-petals {
+  animation: sv-petal-fall linear infinite;
+}
+
+.sv-particle-leaves {
+  animation: sv-leaf-fall linear infinite;
+}
+
+.sv-particle-fireflies {
+  animation: sv-firefly ease-in-out infinite;
+}
+
+.sv-particle-mist {
+  animation: sv-mist-drift linear infinite;
+}
+
+.sv-particle-heat {
+  animation: sv-heat-wave ease-in-out infinite;
+}
+
+.sv-particle-frost {
+  animation: sv-frost-twinkle ease-in-out infinite;
+}
+
+/* ============ 行人工具类 ============ */
+
+.sv-pedestrian-right {
+  animation: sv-walk-right linear infinite;
+}
+
+.sv-pedestrian-left {
+  animation: sv-walk-left linear infinite;
+}
+
+.sv-pedestrian-enter {
+  animation: sv-enter-store ease-out forwards;
+}
+
+.sv-delivery-rider {
+  animation: sv-delivery-out ease-in-out infinite;
+}
+
+/* ============ 圆环 hover ============ */
+
+.sv-ring:hover {
+  animation: sv-ring-pulse 1.5s ease-in-out infinite;
+}
+
+/* ============ 等轴测店铺动画 ============ */
+
+/* 蒸汽上升 */
+@keyframes sv-steam-rise {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-15px) scale(1.3);
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateY(-30px) scale(1.6);
+    opacity: 0;
+  }
+}
+
+.sv-steam {
+  animation: sv-steam-rise ease-out infinite;
+  transform-origin: center bottom;
+}
+
+/* 火焰跳动 */
+@keyframes sv-flame-dance {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+    opacity: 0.15;
+  }
+  25% {
+    transform: scale(1.1) translateY(-1px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(0.95) translateY(1px);
+    opacity: 0.12;
+  }
+  75% {
+    transform: scale(1.05) translateY(-0.5px);
+    opacity: 0.18;
+  }
+}
+
+.sv-flame-glow {
+  animation: sv-flame-dance 0.8s ease-in-out infinite;
+}
+
+/* 灰尘飘浮 */
+@keyframes sv-dust-float {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translate(3px, -2px);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translate(-2px, -4px);
+    opacity: 0.25;
+  }
+  75% {
+    transform: translate(4px, -1px);
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.3;
+  }
+}
+
+.sv-dust {
+  animation: sv-dust-float ease-in-out infinite;
+}
+
+/* 厨师工作动画 */
+@keyframes sv-chef-work {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-1px) rotate(-2deg);
+  }
+  75% {
+    transform: translateY(-1px) rotate(2deg);
+  }
+}
+
+.sv-chef-emoji {
+  animation: sv-chef-work 1.5s ease-in-out infinite;
+}
+
+/* 顾客用餐动画 */
+@keyframes sv-customer-eat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+.sv-customer-emoji {
+  animation: sv-customer-eat 2s ease-in-out infinite;
+}
+
+/* 招牌 SVG 发光 */
+@keyframes sv-sign-glow-svg {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
+  }
+}
+
+.sv-sign-glow-svg {
+  animation: sv-sign-glow-svg 3s ease-in-out infinite;
+}
+
+.sv-sign-glow-rect {
+  animation: sv-sign-glow-svg 3s ease-in-out infinite;
+}
+
+/* 窗户灯光闪烁 */
+@keyframes sv-window-flicker {
+  0%, 100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.sv-window-glow {
+  animation: sv-window-flicker 4s ease-in-out infinite;
+}
+
+/* 营销活动脉冲 */
+@keyframes sv-marketing-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+.sv-marketing-pulse {
+  animation: sv-marketing-pulse 1.5s ease-in-out infinite;
+}
+
+/* 警告闪烁 */
+@keyframes sv-warning-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.sv-warning-blink {
+  animation: sv-warning-blink 1s ease-in-out infinite;
+}
+
+/* 阴影呼吸 */
+@keyframes sv-shadow-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.35;
+  }
+}
+
+.sv-shadow {
+  animation: sv-shadow-breathe 4s ease-in-out infinite;
+}
+
+/* ============ SVG 像素画人物动画 ============ */
+
+/* 厨师左右微摇 */
+@keyframes sv-chef-work-figure {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-1px) rotate(-2deg); }
+  75% { transform: translateX(1px) rotate(2deg); }
+}
+
+.sv-chef-figure {
+  animation: sv-chef-work-figure 1.5s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+/* 顾客微动 */
+@keyframes sv-customer-eat-figure {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.8px); }
+}
+
+.sv-customer-figure {
+  animation: sv-customer-eat-figure 2.5s ease-in-out infinite;
+}
+
+/* 服务员巡回路径 */
+@keyframes sv-waiter-patrol-anim {
+  0% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(4px) translateY(2px); }
+  50% { transform: translateX(0) translateY(4px); }
+  75% { transform: translateX(-4px) translateY(2px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+.sv-waiter-patrol {
+  animation: sv-waiter-patrol-anim 5.5s ease-in-out infinite;
+}
+
+/* 灶台火焰跳动 */
+@keyframes sv-stove-flame-anim {
+  0%, 100% { transform: scaleY(1); opacity: 0.8; }
+  30% { transform: scaleY(1.3); opacity: 1; }
+  60% { transform: scaleY(0.8); opacity: 0.7; }
+}
+
+.sv-stove-flame {
+  animation: sv-stove-flame-anim 0.6s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+/* 行人横向移动（右）— 保留兼容 */
+@keyframes sv-pedestrian-walk-right {
+  0% { transform: translateX(-40px); opacity: 0; }
+  5% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(300px); opacity: 0; }
+}
+
+/* 行人横向移动（左）— 保留兼容 */
+@keyframes sv-pedestrian-walk-left {
+  0% { transform: translateX(300px); opacity: 0; }
+  5% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(-40px); opacity: 0; }
+}
+
+.sv-pedestrian-right-figure {
+  animation: sv-pedestrian-walk-right linear infinite;
+}
+
+.sv-pedestrian-left-figure {
+  animation: sv-pedestrian-walk-left linear infinite;
+}
+
+/* ============ 等轴测30°角行人动画 ============ */
+
+/* 行人沿前沿方向移动（右下，30°角）
+   cos30≈0.866, sin30=0.5 → 位移比 Y/X ≈ 0.577
+   总行程约 330px 沿前沿方向
+   注意：位移值基于 medium 店铺尺寸(width=280)，大/小店铺可能略有偏差但视觉可接受 */
+@keyframes sv-pedestrian-iso-walk-right {
+  0% {
+    transform: translate(var(--walk-start-x, -35px), var(--walk-start-y, -20px));
+    opacity: 0;
+  }
+  5% { opacity: 1; }
+  90% { opacity: 1; }
+  100% {
+    transform: translate(var(--walk-end-x, 260px), var(--walk-end-y, 150px));
+    opacity: 0;
+  }
+}
+
+/* 行人沿前沿方向移动（左上，反向30°角）
+   位移值与 iso-walk-right 对称 */
+@keyframes sv-pedestrian-iso-walk-left {
+  0% {
+    transform: translate(var(--walk-end-x, 260px), var(--walk-end-y, 150px));
+    opacity: 0;
+  }
+  5% { opacity: 1; }
+  90% { opacity: 1; }
+  100% {
+    transform: translate(var(--walk-start-x, -35px), var(--walk-start-y, -20px));
+    opacity: 0;
+  }
+}
+
+.sv-pedestrian-iso-right {
+  animation: sv-pedestrian-iso-walk-right linear infinite;
+}
+
+.sv-pedestrian-iso-left {
+  animation: sv-pedestrian-iso-walk-left linear infinite;
+}
+
+/* 进店缩小淡出（从道路拐向门口） */
+@keyframes sv-entering-customer {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55% {
+    transform: translate(var(--enter-mid-dx, 0px), var(--enter-mid-dy, -8px)) scale(0.86);
+    opacity: 0.78;
+  }
+  78% {
+    transform: translate(calc(var(--enter-dx, 0px) * 0.88), calc(var(--enter-dy, -10px) * 0.88)) scale(0.8);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(var(--enter-dx, 0px), var(--enter-dy, -16px)) scale(0.65);
+    opacity: 0;
+  }
+}
+
+.sv-entering-figure {
+  animation: sv-entering-customer 1.5s ease-out forwards;
+}
+
+/* 门口等候顾客微动 */
+@keyframes sv-door-idle-anim {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.2px); }
+}
+
+.sv-door-idle {
+  animation: sv-door-idle-anim 3s ease-in-out infinite;
+  opacity: 0.85;
+}
+
+/* 骑手出发驶离（保留水平兼容） */
+@keyframes sv-delivery-depart {
+  0% { transform: translateX(0) scale(1); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(178px) translateY(-2px) scale(0.78); opacity: 0; }
+}
+
+.sv-delivery-rider {
+  animation: sv-delivery-depart 5s ease-in-out infinite;
+}
+
+/* 骑手沿等轴测30°角驶离
+   位移 155px/90px ≈ cos30/sin30 比例，基于 medium 店铺前沿长度约 180px */
+@keyframes sv-delivery-depart-iso {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% {
+    transform: translate(var(--rider-out-x, 155px), var(--rider-out-y, 90px)) scale(0.78);
+    opacity: 0;
+  }
+}
+
+.sv-delivery-rider-iso {
+  animation: sv-delivery-depart-iso ease-in-out infinite;
+}
+
+@keyframes sv-rider-turn-in {
+  0% {
+    transform: translate(0, 0) scale(0.96);
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  58% {
+    transform: translate(var(--turn-mid-dx, 0px), var(--turn-mid-dy, 0px)) scale(0.88);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--turn-dx, 0px), var(--turn-dy, 0px)) scale(0.72);
+    opacity: 0;
+  }
+}
+
+.sv-rider-turn-in {
+  animation: sv-rider-turn-in ease-in forwards;
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  .sv-steam,
+  .sv-flame-glow,
+  .sv-dust,
+  .sv-chef-emoji,
+  .sv-customer-emoji,
+  .sv-sign-glow-svg,
+  .sv-sign-glow-rect,
+  .sv-window-glow,
+  .sv-marketing-pulse,
+  .sv-warning-blink,
+  .sv-shadow,
+  .sv-chef-figure,
+  .sv-customer-figure,
+  .sv-waiter-patrol,
+  .sv-stove-flame,
+  .sv-pedestrian-right-figure,
+  .sv-pedestrian-left-figure,
+  .sv-pedestrian-iso-right,
+  .sv-pedestrian-iso-left,
+  .sv-entering-figure,
+  .sv-door-idle,
+  .sv-delivery-rider,
+  .sv-delivery-rider-iso,
+  .sv-rider-turn-in {
+    animation: none;
+  }
+}
