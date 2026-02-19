@@ -110,7 +110,10 @@ async function readSSEStream(
   response: Response,
   onChunk: (chunk: string) => void,
 ): Promise<{ content: string; toolCalls: ToolCallMessage[] }> {
-  const reader = response.body!.getReader();
+  if (!response.body) {
+    throw new LLMError(0, 'Response body is null, streaming not supported');
+  }
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let fullContent = '';
   let buffer = '';

@@ -34,7 +34,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/360simulator.git
+git clone https://github.com/niuniu-869/360simulator.git
 cd 360simulator
 
 # 安装依赖并启动开发服务器
