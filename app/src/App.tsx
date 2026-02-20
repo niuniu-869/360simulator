@@ -199,7 +199,7 @@ function App() {
   // 筹备阶段检查
   const setupSteps = [
     { id: 'brand', label: '选择品牌', desc: '加盟或自主', completed: !!gameState.selectedBrand, icon: Store },
-    { id: 'location', label: '选址决策', desc: '区位与地段', completed: !!gameState.selectedLocation, icon: MapPin },
+    { id: 'location', label: '选址决策', desc: '区位与地段', completed: !!gameState.selectedLocation && !!gameState.selectedAddress, icon: MapPin },
     { id: 'decoration', label: '装修风格', desc: '风格与档次', completed: !!gameState.selectedDecoration, icon: Paintbrush },
     { id: 'product', label: '选品策略', desc: '最多选5种', completed: gameState.selectedProducts.length > 0, icon: Utensils },
     { id: 'staff', label: '人员配置', desc: '招聘员工', completed: gameState.staff.length > 0, icon: Users },
