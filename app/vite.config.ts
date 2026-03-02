@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   Object.assign(process.env, env);
 
   return {
-    base: '/360/',
+    base: '/',
     plugins: [inspectAttr(), react(), llmProxyPlugin()],
     resolve: {
       alias: {

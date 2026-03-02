@@ -45,6 +45,10 @@ npm run dev
 
 访问 `http://localhost:5173` 开始游戏。
 
+### 在线体验
+
+**[https://yongge.site](https://yongge.site)**
+
 ### 启用赛博勇哥（可选）
 
 赛博勇哥需要 LLM API 支持，兼容所有 OpenAI 格式的接口：

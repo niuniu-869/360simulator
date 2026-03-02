@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DIST_DIR = join(__dirname, 'dist');
 const PORT = parseInt(process.env.PORT || '10041', 10);
-const BASE_PATH = '/360'; // 与 vite.config.ts 中的 base 一致
+const BASE_PATH = ''; // 与 vite.config.ts 中的 base 一致
 
 // ============ 环境变量（服务端私有，不会暴露到前端） ============
 
