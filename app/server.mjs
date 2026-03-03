@@ -8,13 +8,17 @@
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { join, extname, resolve } from 'node:path';
+import { join, extname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const DIST_DIR = join(__dirname, 'dist');
 const PORT = parseInt(process.env.PORT || '10041', 10);
 const BASE_PATH = ''; // 与 vite.config.ts 中的 base 一致
+const LLM_PROXY_TOKEN = (process.env.LLM_PROXY_TOKEN || '').trim();
+const LLM_PROXY_RATE_LIMIT = Number.parseInt(process.env.LLM_PROXY_RATE_LIMIT || '30', 10);
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateLimitStore = new Map();
 
 // ============ 环境变量（服务端私有，不会暴露到前端） ============
 
@@ -33,6 +37,62 @@ function normalizeChatCompletionsUrl(raw) {
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
   if (base.endsWith('/v1')) return `${base}/chat/completions`;
   return `${base}/v1/chat/completions`;
+}
+
+function isPathInside(basePath, candidatePath) {
+  const rel = relative(basePath, candidatePath);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function parseHostName(hostHeader = '') {
+  const raw = hostHeader.split(',')[0].trim();
+  return raw.replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+}
+
+function isSameHostOrigin(origin, hostHeader) {
+  if (!origin) return false;
+  try {
+    const originHost = new URL(origin).hostname;
+    return originHost === parseHostName(hostHeader);
+  } catch {
+    return false;
+  }
+}
+
+function isLoopbackAddress(address = '') {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+function hasValidProxyToken(req) {
+  if (!LLM_PROXY_TOKEN) return false;
+  const auth = req.headers.authorization || '';
+  return auth === `Bearer ${LLM_PROXY_TOKEN}`;
+}
+
+function isAuthorizedProxyRequest(req) {
+  if (LLM_PROXY_TOKEN) {
+    return hasValidProxyToken(req);
+  }
+  return isLoopbackAddress(req.socket.remoteAddress || '');
+}
+
+function isRateLimited(req) {
+  const maxRequests = Number.isFinite(LLM_PROXY_RATE_LIMIT) && LLM_PROXY_RATE_LIMIT > 0
+    ? LLM_PROXY_RATE_LIMIT
+    : 30;
+  const clientId = (req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim()
+    || req.socket.remoteAddress
+    || 'unknown';
+  const now = Date.now();
+  const entry = rateLimitStore.get(clientId);
+
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitStore.set(clientId, { windowStart: now, count: 1 });
+    return false;
+  }
+
+  entry.count += 1;
+  return entry.count > maxRequests;
 }
 
 // ============ 静态文件服务 ============
@@ -63,7 +123,7 @@ async function serveStatic(req, res) {
 
   // 路径穿越防护：规范化后检查是否仍在 DIST_DIR 内
   let filePath = resolve(DIST_DIR, urlPath.replace(/^\/+/, ''));
-  if (!filePath.startsWith(DIST_DIR)) {
+  if (!isPathInside(DIST_DIR, filePath)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end('Forbidden');
     return;
@@ -92,6 +152,17 @@ async function serveStatic(req, res) {
 // ============ LLM 代理 ============
 
 async function proxyLLM(req, res) {
+  if (!isAuthorizedProxyRequest(req)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Forbidden: LLM proxy access denied' }));
+    return;
+  }
+  if (isRateLimited(req)) {
+    res.writeHead(429, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: '请求过于频繁，请稍后重试' }));
+    return;
+  }
+
   const { apiKey, model, baseUrl } = getEnvConfig();
 
   if (!apiKey) {
@@ -192,11 +263,11 @@ const server = createServer(async (req, res) => {
   // CORS preflight（仅允许同源，生产环境 BFF 同源部署无需通配符）
   if (req.method === 'OPTIONS') {
     const origin = req.headers.origin || '';
-    const allowed = origin && new URL(origin).hostname === (req.headers.host || '').split(':')[0];
+    const allowed = isSameHostOrigin(origin, req.headers.host || '');
     res.writeHead(204, {
       ...(allowed ? { 'Access-Control-Allow-Origin': origin } : {}),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
     });
     res.end();

@@ -176,7 +176,6 @@ export function calculateSupply(
 
   // 3a. 计算每个产品的"需求工时权重" = demandQty × makeTimeHours
   const productWeights = new Map<string, number>();
-  let totalWeight = 0;
 
   products.forEach(product => {
     const demandQty = demandHints?.get(product.id) ?? 0;
@@ -184,7 +183,6 @@ export function calculateSupply(
     // 即使需求为0，也给一个最小权重避免完全不分配
     const weight = Math.max(0.01, demandQty * makeTimeHours);
     productWeights.set(product.id, weight);
-    totalWeight += weight;
   });
 
   // 3b. 分配每个员工的工时到各产品

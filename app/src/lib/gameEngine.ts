@@ -453,15 +453,15 @@ export function weeklyTick(prev: GameState): {
   const newSeason = getSeasonFromMonth(currentMonth);
 
   // ============ v3 增长系统：曝光存量 + 营销脉冲 + 口碑置信 ============
-  const locationFloor = getLocationExposureFloor(prev.selectedAddress?.trafficModifier || 1);
-  const fallbackLaunch = clamp(prev.currentWeek * 4 + 8, 0, 100);
-  const prevGrowth = prev.growthSystem ?? {
+  const locationFloor = getLocationExposureFloor(prevWithEffects.selectedAddress?.trafficModifier || 1);
+  const fallbackLaunch = clamp(prevWithEffects.currentWeek * 4 + 8, 0, 100);
+  const prevGrowth = prevWithEffects.growthSystem ?? {
     launchProgress: fallbackLaunch,
     awarenessFactor: mapLaunchProgressToAwareness(fallbackLaunch),
-    awarenessStock: Math.max(locationFloor, prev.exposure * 0.7),
-    campaignPulse: Math.max(0, prev.exposure * 0.3),
-    trustConfidence: clamp(0.1 + prev.currentWeek * 0.03, 0.1, 0.8),
-    repeatIntent: clamp(prev.reputation, 35, 80),
+    awarenessStock: Math.max(locationFloor, prevWithEffects.exposure * 0.7),
+    campaignPulse: Math.max(0, prevWithEffects.exposure * 0.3),
+    trustConfidence: clamp(0.1 + prevWithEffects.currentWeek * 0.03, 0.1, 0.8),
+    repeatIntent: clamp(prevWithEffects.reputation, 35, 80),
   };
 
   let launchProgress = prevGrowth.launchProgress;
@@ -469,7 +469,8 @@ export function weeklyTick(prev: GameState): {
   let campaignPulse = prevGrowth.campaignPulse;
   let trustConfidence = prevGrowth.trustConfidence;
   let repeatIntent = prevGrowth.repeatIntent;
-  let newReputation = prev.reputation;
+  let newReputation = prevWithEffects.reputation;
+  const delayedExposureDelta = prevWithEffects.exposure - prev.exposure;
 
   // 存量/脉冲自然衰减：存量慢衰、脉冲快衰
   awarenessStock = Math.max(locationFloor, awarenessStock - Math.max(0.35, awarenessStock * 0.02));
@@ -483,7 +484,7 @@ export function weeklyTick(prev: GameState): {
   let launchGainFromActivities = 0;
 
   // Step 1: 营销活动改为主要作用在“脉冲/信任”，不再直接给需求硬加成
-  prev.activeMarketingActivities.forEach(activity => {
+  prevWithEffects.activeMarketingActivities.forEach(activity => {
     const config = getActivityConfig(activity.id);
     if (!config) return;
 
@@ -515,7 +516,7 @@ export function weeklyTick(prev: GameState): {
   awarenessStock += marketerExposureBoost * 0.12;
 
   // Step 1.8: 不活跃惩罚（主要打击脉冲和开业进度）
-  const inactiveWeeks = prev.weeksSinceLastAction || 0;
+  const inactiveWeeks = prevWithEffects.weeksSinceLastAction || 0;
   if (inactiveWeeks >= 3) {
     const inactivityPenalty = Math.min(3, (inactiveWeeks - 2) * 0.6);
     campaignPulseGain -= inactivityPenalty;
@@ -532,7 +533,7 @@ export function weeklyTick(prev: GameState): {
   newReputation += trustGainFromActivities * confidenceGainFactor;
 
   // Step 2.5: 快招品牌蜜月期虚假口碑加成（保留，但缩小并随周次衰减）
-  if (prev.selectedBrand?.isQuickFranchise && newWeek <= QUICK_FRANCHISE_HONEYMOON.weeks) {
+  if (prevWithEffects.selectedBrand?.isQuickFranchise && newWeek <= QUICK_FRANCHISE_HONEYMOON.weeks) {
     const remainingRatio = (QUICK_FRANCHISE_HONEYMOON.weeks - newWeek + 1) / QUICK_FRANCHISE_HONEYMOON.weeks;
     newReputation += QUICK_FRANCHISE_HONEYMOON.fakeReputationBoost * 0.45 * remainingRatio;
   }
@@ -543,14 +544,14 @@ export function weeklyTick(prev: GameState): {
 
   // 周边店铺动态更新
   const shopEvents: NearbyShopEvent[] = [];
-  let updatedNearbyShops = updateShopPrices(prev.nearbyShops);
+  let updatedNearbyShops = updateShopPrices(prevWithEffects.nearbyShops);
 
   // 尝试新开店
-  const rentBase = prev.selectedLocation
-    ? prev.selectedLocation.rentPerSqm * (prev.selectedAddress?.rentModifier || 1) * (prev.selectedAddress?.area || 30)
+  const rentBase = prevWithEffects.selectedLocation
+    ? prevWithEffects.selectedLocation.rentPerSqm * (prevWithEffects.selectedAddress?.rentModifier || 1) * (prevWithEffects.selectedAddress?.area || 30)
     : 3000;
   const newShop = tryGenerateNewShop(
-    prev.selectedLocation?.type || 'community',
+    prevWithEffects.selectedLocation?.type || 'community',
     updatedNearbyShops, newWeek, rentBase
   );
   if (newShop) {
@@ -570,15 +571,15 @@ export function weeklyTick(prev: GameState): {
   shopEvents.push(...closingResult.events);
 
   // 估算店铺利润
-  const areaTotalDemand = prev.selectedLocation
-    ? Object.values(prev.selectedLocation.footTraffic).reduce((s, v) => s + v, 0)
+  const areaTotalDemand = prevWithEffects.selectedLocation
+    ? Object.values(prevWithEffects.selectedLocation.footTraffic).reduce((s, v) => s + v, 0)
     : 500;
   updatedNearbyShops = updateShopProfits(updatedNearbyShops, areaTotalDemand);
 
   // 修复 #9：消费者环季节性波动（基于 baseConsumerRings 原始值）
-  const baseRings = prev.baseConsumerRings.length > 0
-    ? prev.baseConsumerRings
-    : prev.consumerRings || [];
+  const baseRings = prevWithEffects.baseConsumerRings.length > 0
+    ? prevWithEffects.baseConsumerRings
+    : prevWithEffects.consumerRings || [];
   const seasonAdjustedRings = applySeasonalTrafficVariation(baseRings, newSeason);
   const updatedConsumerRings = assignNearbyShopsToConsumerRings(
     seasonAdjustedRings,
@@ -608,7 +609,7 @@ export function weeklyTick(prev: GameState): {
   const revenue = supplyDemandResult.totalRevenue;
 
   // ============ 外卖平台状态更新（v3.0：权重分驱动） ============
-  let updatedDeliveryState = { ...prev.deliveryState };
+  let updatedDeliveryState = { ...prevWithEffects.deliveryState };
   let weeklyPromotionCostTotal = 0;
 
   if (updatedDeliveryState.platforms.length > 0) {
@@ -627,7 +628,7 @@ export function weeklyTick(prev: GameState): {
       + unfulfilledOrders * RATING_GROWTH_CONFIG.ratingPerUnfulfilledOrder;
 
     // 食材升级活动加成
-    const hasIngredientUpgrade = prev.activeMarketingActivities.some(
+    const hasIngredientUpgrade = prevWithEffects.activeMarketingActivities.some(
       a => a.id === 'ingredient_upgrade'
     );
     if (hasIngredientUpgrade) ratingGrowth += RATING_GROWTH_CONFIG.ingredientUpgradeBonus;
@@ -806,7 +807,7 @@ export function weeklyTick(prev: GameState): {
   }
 
   // 整洁度影响口碑（与服务质量并列）
-  const currentCleanliness = prev.cleanliness ?? 60;
+  const currentCleanliness = prevWithEffects.cleanliness ?? 60;
   if (currentCleanliness >= 80) reputationDelta += 0.35;
   if (currentCleanliness < 40) reputationDelta -= 0.8;
   if (currentCleanliness < 20) reputationDelta -= 1.8;
@@ -840,7 +841,7 @@ export function weeklyTick(prev: GameState): {
 
   // 开业进度：由动作/履约/真实经营结果驱动，替代“按周自动上升”
   let launchDelta = 0;
-  if (prev.activeMarketingActivities.length > 0) launchDelta += 1.2;
+  if (prevWithEffects.activeMarketingActivities.length > 0) launchDelta += 1.2;
   if (updatedDeliveryState.platforms.length > 0) launchDelta += 0.8;
   if (orderSample > 120) launchDelta += 1.2;
   else if (orderSample > 60) launchDelta += 0.6;
@@ -872,12 +873,15 @@ export function weeklyTick(prev: GameState): {
   for (const buff of updatedEventBuffs) {
     if (buff.type === 'exposure_weekly') newExposure = clamp(newExposure + buff.value, locationFloor, 100);
   }
+  if (delayedExposureDelta !== 0) {
+    newExposure = clamp(newExposure + delayedExposureDelta, locationFloor, 100);
+  }
 
   // 计算连续盈利周数
   const newConsecutiveProfits = finalProfit > 0 ? (prev.consecutiveProfits || 0) + 1 : 0;
 
   // ============ 认知系统更新（纯被动增长） ============
-  let newCognition = { ...prev.cognition };
+  let newCognition = { ...prevWithEffects.cognition };
   const expSources: { label: string; exp: number }[] = [];
 
   // 1. 基础时间经验
@@ -970,7 +974,7 @@ export function weeklyTick(prev: GameState): {
     detectedMistakes.push('quick_franchise');
   }
   // 库存积压：库存总价值 > 上周收入的 2 倍
-  if (prev.inventoryState.totalValue > prev.weeklyRevenue * 2 && prev.weeklyRevenue > 0
+  if (prevWithEffects.inventoryState.totalValue > prev.weeklyRevenue * 2 && prev.weeklyRevenue > 0
       && !newMistakeHistory.some(m => m.type === 'inventory_overstock')) {
     detectedMistakes.push('inventory_overstock');
   }
@@ -1167,7 +1171,7 @@ export function weeklyTick(prev: GameState): {
   const totalSalesForDirt = supplyDemandResult.productSales.reduce(
     (sum, ps) => sum + ps.actualSales, 0
   );
-  const storeArea = prev.storeArea || 30;
+  const storeArea = prevWithEffects.storeArea || 30;
   const dirtRate = BASE_DIRT + storeArea / AREA_DIRT_FACTOR + totalSalesForDirt / SALES_DIRT_FACTOR;
 
   // 估算服务员忙碌率（基于需求/供给比）
@@ -1195,10 +1199,10 @@ export function weeklyTick(prev: GameState): {
     }
     // 后厨、营销不参与清洁
   });
-  const newCleanliness = Math.max(0, Math.min(100, (prev.cleanliness ?? 60) - dirtRate + cleanerRecovery));
+  const newCleanliness = Math.max(0, Math.min(100, (prevWithEffects.cleanliness ?? 60) - dirtRate + cleanerRecovery));
 
   // ============ 营销活动状态更新 ============
-  const updatedMarketingActivities = prev.activeMarketingActivities
+  const updatedMarketingActivities = prevWithEffects.activeMarketingActivities
     .map(activity => ({
       ...activity,
       activeWeeks: activity.activeWeeks + 1,
@@ -1216,7 +1220,7 @@ export function weeklyTick(prev: GameState): {
   let weeklyHoldingCost = 0;
   let weeklyRestockCost = 0;
 
-  const updatedInventoryItems = prev.inventoryState.items.map(item => {
+  const updatedInventoryItems = prevWithEffects.inventoryState.items.map(item => {
     const updated = { ...item };
 
     // Step 1: 损耗扣减（按存储类型）
@@ -1243,7 +1247,7 @@ export function weeklyTick(prev: GameState): {
       updated.restockStrategy = 'auto_standard';
     }
     const restockQty = calculateRestockQuantity(
-      updated.quantity, actualSales, updated.restockStrategy, prev.cognition.level
+      updated.quantity, actualSales, updated.restockStrategy, prevWithEffects.cognition.level
     );
     if (restockQty > 0) {
       const restockCost = restockQty * item.unitCost;
@@ -1404,7 +1408,7 @@ export function weeklyTick(prev: GameState): {
       ? (newCumulativeProfit / prev.totalInvestment) * 100
       : 0,
     healthAlerts,
-    cleanlinessChange: newCleanliness - (prev.cleanliness ?? 60),
+    cleanlinessChange: newCleanliness - (prevWithEffects.cleanliness ?? 60),
     delayedEffectNarratives,
     activeBuffSummaries,
     staffWorkStats,
@@ -1439,7 +1443,7 @@ export function weeklyTick(prev: GameState): {
         .map(d => d.id)
         .filter(d => !revealed.includes(d));
 
-      const dimCount = prev.cognition.level >= 3 ? Math.min(2, unrevealed.length || 1) : 1;
+      const dimCount = prevWithEffects.cognition.level >= 3 ? Math.min(2, unrevealed.length || 1) : 1;
       const dims: InvestigationDimension[] = [];
       const dimPool = unrevealed.length > 0 ? [...unrevealed] : INVESTIGATION_DIMENSIONS.map(d => d.id);
       for (let i = 0; i < dimCount && dimPool.length > 0; i++) {
@@ -1450,7 +1454,7 @@ export function weeklyTick(prev: GameState): {
 
       const results = dims.map(dim => {
         const { displayValue, isAccurate, cogWarning } = generateInvestigationResult(
-          targetShop, dim, prev.cognition.level, prev.currentWeek
+          targetShop, dim, prevWithEffects.cognition.level
         );
         return {
           shopId: targetShop.id,
@@ -1485,7 +1489,7 @@ export function weeklyTick(prev: GameState): {
         const shopTraffic = Math.round(targetShop.exposure * 1.2 + 15);
         const dailyTraffic = Math.round(shopTraffic / 7);
         const { displayValue, isAccurate, cogWarning } = generateTrafficCountResult(
-          Math.max(1, dailyTraffic), prev.cognition.level
+          Math.max(1, dailyTraffic), prevWithEffects.cognition.level
         );
         newBossAction.investigationHistory = [
           ...newBossAction.investigationHistory,
@@ -1512,7 +1516,7 @@ export function weeklyTick(prev: GameState): {
       // 转换为日均客流
       const dailyTraffic = Math.round(totalWeeklyTraffic / 7);
       const { displayValue, isAccurate, cogWarning } = generateTrafficCountResult(
-        Math.max(1, dailyTraffic), prev.cognition.level
+        Math.max(1, dailyTraffic), prevWithEffects.cognition.level
       );
       newBossAction.investigationHistory = [
         ...newBossAction.investigationHistory,
@@ -1536,7 +1540,7 @@ export function weeklyTick(prev: GameState): {
       ? prev.selectedProducts[0].category
       : undefined;
     const { content, isAccurate, cogWarning, buff } = generateDinnerInsight(
-      prev.cognition.level, prev.currentWeek, playerCategory
+      prevWithEffects.cognition.level, prev.currentWeek, playerCategory
     );
     const insight: typeof newBossAction.insightHistory[0] = {
       content, isAccurate, cogWarning, week: prev.currentWeek,

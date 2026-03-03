@@ -246,7 +246,7 @@ export function applyEventEffects(
   effects: InteractiveEventEffects,
   sourceEventId?: string,
 ): GameState {
-  let newState = { ...state };
+  const newState = { ...state };
 
   // === 即时数值效果 ===
   if (effects.cash) {

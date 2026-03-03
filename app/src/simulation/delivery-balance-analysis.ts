@@ -172,8 +172,7 @@ function calcDeliveryDemandV3(
 
 // ============ 现实基准 ============
 
-// @ts-ignore 保留作参考基准
-const _BENCHMARKS = {
+const BENCHMARKS = {
   tiny_15sqm:   { label: '15㎡档口', weeklyRange: [210, 560] },
   small_30sqm:  { label: '30㎡小店', weeklyRange: [350, 1050] },
   medium_50sqm: { label: '50㎡标准', weeklyRange: [560, 1750] },
@@ -181,10 +180,10 @@ const _BENCHMARKS = {
 };
 
 function getBenchmarkUpper(area: number): number {
-  if (area <= 20) return 560;
-  if (area <= 35) return 1050;
-  if (area <= 55) return 1750;
-  return 2800;
+  if (area <= 20) return BENCHMARKS.tiny_15sqm.weeklyRange[1];
+  if (area <= 35) return BENCHMARKS.small_30sqm.weeklyRange[1];
+  if (area <= 55) return BENCHMARKS.medium_50sqm.weeklyRange[1];
+  return BENCHMARKS.large_80sqm.weeklyRange[1];
 }
 
 // ============ 主分析 ============

@@ -148,7 +148,6 @@ export function generateInvestigationResult(
   shop: NearbyShop,
   dimension: InvestigationDimension,
   cogLevel: CognitionLevel,
-  _week: number,
 ): { displayValue: string; isAccurate: boolean; cogWarning?: string } {
   const isAccurate = Math.random() < INVESTIGATION_ACCURACY[cogLevel];
 

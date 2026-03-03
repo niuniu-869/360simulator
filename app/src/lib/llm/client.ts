@@ -155,7 +155,9 @@ async function readSSEStream(
           for (const tc of delta.tool_calls) {
             const idx = tc.index ?? 0;
             // 提取已知字段，其余作为 extras 透传
-            const { index: _idx, id, type: _type, function: fn, ...extras } = tc;
+            const { id, function: fn, ...extras } = tc;
+            delete (extras as { index?: number }).index;
+            delete (extras as { type?: string }).type;
             const existing = toolCallsMap.get(idx);
             if (!existing) {
               toolCallsMap.set(idx, {

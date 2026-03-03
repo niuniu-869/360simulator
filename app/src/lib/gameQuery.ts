@@ -11,14 +11,17 @@ import {
   WIN_STREAK,
   WIN_EXPOSURE,
   WIN_REPUTATION,
+  MIN_OPERATING_CASH,
   calculateFixedCostBreakdown,
   calculateWeeklyFixedCost,
   calculateVariableCost,
   calculateWeeklyPromotionCost,
+  getEffectiveSupplyCostModifier,
 } from '@/lib/gameEngine';
 import { calculateSupplyDemand } from '@/lib/supplyDemand';
 import {
   brands, locations, decorations, products, staffTypes,
+  SETUP_FIXED_COSTS,
 } from '@/data/gameData';
 import { PRODUCT_ADJUSTMENT_CONFIG } from '@/data/productAdjustmentData';
 import { DELIVERY_PLATFORMS } from '@/data/deliveryData';
@@ -131,6 +134,22 @@ export function computeSupplyDemandResult(state: GameState): SupplyDemandResult 
 
 /** 检查是否满足开店条件 */
 export function computeCanOpen(state: GameState): boolean {
+  const area = state.selectedAddress?.area || state.storeArea;
+  const rentModifier = state.selectedAddress?.rentModifier || 1;
+  const weeklyRent = (state.selectedLocation?.rentPerSqm || 0) * area * rentModifier / 4;
+  const monthlyRent = weeklyRent * 4;
+  const setupCost = SETUP_FIXED_COSTS.businessLicense
+    + SETUP_FIXED_COSTS.equipmentBase
+    + SETUP_FIXED_COSTS.firstBatchInventory
+    + monthlyRent * (SETUP_FIXED_COSTS.depositMonths + SETUP_FIXED_COSTS.prepaidRentMonths);
+  const scm = getEffectiveSupplyCostModifier(state);
+  const stockWeeks = state.cognition.level < 1 ? 4 : 1.5;
+  const projectedRestockCost = state.selectedProducts.reduce((sum, p) => {
+    const qty = Math.ceil(50 * stockWeeks);
+    return sum + qty * p.baseCost * scm;
+  }, 0);
+  const projectedCashAfterOpen = state.cash - setupCost - projectedRestockCost;
+
   return (
     state.selectedBrand !== null &&
     state.selectedLocation !== null &&
@@ -138,7 +157,7 @@ export function computeCanOpen(state: GameState): boolean {
     state.selectedDecoration !== null &&
     state.selectedProducts.length > 0 &&
     state.staff.length > 0 &&
-    state.cash >= 0
+    projectedCashAfterOpen >= MIN_OPERATING_CASH
   );
 }
 

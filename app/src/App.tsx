@@ -123,7 +123,7 @@ function App() {
         assignStaffToTask(s.id, task);
       }
     });
-  }, [gameState.staff.length, assignStaffToTask]);
+  }, [gameState.staff, assignStaffToTask]);
 
   // 一键采纳勇哥提案
   const handleApplyProposals = useCallback((proposals: Proposal[]) => {

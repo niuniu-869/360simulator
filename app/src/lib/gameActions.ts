@@ -11,6 +11,7 @@ import type { GameAction, ActionResult } from '@/lib/gameActionTypes';
 import { applyEventEffects, rollInteractiveEvent, isNotificationEvent } from '@/lib/eventEngine';
 import {
   INITIAL_CASH,
+  MIN_OPERATING_CASH,
   getSeasonFromMonth,
   createInitialGameState,
   calculateWeeklyFixedCost,
@@ -60,6 +61,13 @@ function bumpOps(prev: GameState): GameState['cognition'] {
     ...prev.cognition,
     weeklyOperationCount: (prev.cognition.weeklyOperationCount || 0) + 1,
   };
+}
+
+function requireOperatingPhase(prev: GameState, actionName: string): ActionResult | null {
+  if (prev.gamePhase !== 'operating') {
+    return fail(prev, `${actionName}仅经营阶段可执行`);
+  }
+  return null;
 }
 
 // ============ 主 dispatch 函数 ============
@@ -376,6 +384,8 @@ function handleFireStaff(prev: GameState, staffId: string): ActionResult {
 }
 
 function handleRecruitStaff(prev: GameState, channelId: string, staffTypeId: string, assignedTask?: string): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '招聘');
+  if (phaseGuard) return phaseGuard;
   const channel = RECRUITMENT_CHANNELS.find(c => c.id === channelId);
   if (!channel) return fail(prev, `Channel not found: ${channelId}`);
   if (!staffTypes.find(s => s.id === staffTypeId)) return fail(prev, `Staff type not found: ${staffTypeId}`);
@@ -389,6 +399,8 @@ function handleRecruitStaff(prev: GameState, channelId: string, staffTypeId: str
 // ============ 外卖平台 Handlers ============
 
 function handleJoinPlatform(prev: GameState, platformId: string): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '外卖平台操作');
+  if (phaseGuard) return phaseGuard;
   const platform = getDeliveryPlatform(platformId);
   if (!platform) return fail(prev, `Platform not found: ${platformId}`);
 
@@ -425,7 +437,8 @@ function handleJoinPlatform(prev: GameState, platformId: string): ActionResult {
 }
 
 function handleLeavePlatform(prev: GameState, platformId: string): ActionResult {
-  if (prev.gamePhase !== 'operating') return fail(prev, '仅经营阶段可操作外卖平台');
+  const phaseGuard = requireOperatingPhase(prev, '外卖平台操作');
+  if (phaseGuard) return phaseGuard;
   if (!prev.deliveryState.platforms.some(p => p.platformId === platformId)) {
     return fail(prev, `未加入该平台: ${platformId}`);
   }
@@ -436,7 +449,8 @@ function handleLeavePlatform(prev: GameState, platformId: string): ActionResult 
 }
 
 function handleTogglePromotion(prev: GameState, platformId: string, tierIndex: number): ActionResult {
-  if (prev.gamePhase !== 'operating') return fail(prev, '仅经营阶段可操作推广');
+  const phaseGuard = requireOperatingPhase(prev, '推广设置');
+  if (phaseGuard) return phaseGuard;
   if (!prev.deliveryState.platforms.some(p => p.platformId === platformId)) {
     return fail(prev, `未加入该平台: ${platformId}`);
   }
@@ -448,7 +462,8 @@ function handleTogglePromotion(prev: GameState, platformId: string, tierIndex: n
 }
 
 function handleSetDiscountTier(prev: GameState, platformId: string, tierId: string): ActionResult {
-  if (prev.gamePhase !== 'operating') return fail(prev, '仅经营阶段可操作满减');
+  const phaseGuard = requireOperatingPhase(prev, '满减设置');
+  if (phaseGuard) return phaseGuard;
   if (!prev.deliveryState.platforms.some(p => p.platformId === platformId)) {
     return fail(prev, `未加入该平台: ${platformId}`);
   }
@@ -460,7 +475,8 @@ function handleSetDiscountTier(prev: GameState, platformId: string, tierId: stri
 }
 
 function handleSetDeliveryPricing(prev: GameState, platformId: string, pricingId: string): ActionResult {
-  if (prev.gamePhase !== 'operating') return fail(prev, '仅经营阶段可操作外卖定价');
+  const phaseGuard = requireOperatingPhase(prev, '外卖定价设置');
+  if (phaseGuard) return phaseGuard;
   if (!prev.deliveryState.platforms.some(p => p.platformId === platformId)) {
     return fail(prev, `未加入该平台: ${platformId}`);
   }
@@ -472,7 +488,8 @@ function handleSetDeliveryPricing(prev: GameState, platformId: string, pricingId
 }
 
 function handleSetPackagingTier(prev: GameState, platformId: string, tierId: string): ActionResult {
-  if (prev.gamePhase !== 'operating') return fail(prev, '仅经营阶段可操作包装');
+  const phaseGuard = requireOperatingPhase(prev, '包装设置');
+  if (phaseGuard) return phaseGuard;
   if (!prev.deliveryState.platforms.some(p => p.platformId === platformId)) {
     return fail(prev, `未加入该平台: ${platformId}`);
   }
@@ -524,6 +541,13 @@ function handleOpenStore(prev: GameState, season?: Season): ActionResult {
   });
   const restockCost = initialItems.reduce((s, i) => s + i.lastRestockCost, 0);
   const totalValue = initialItems.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+  const cashAfterOpen = prev.cash - restockCost - setupCost;
+  if (cashAfterOpen < MIN_OPERATING_CASH) {
+    return fail(
+      prev,
+      `开店后现金将低于最低运营线（${MIN_OPERATING_CASH}），当前预计为 ${Math.round(cashAfterOpen)}`
+    );
+  }
 
   return ok({
     ...prev, isOpen: true, gamePhase: 'operating',
@@ -538,6 +562,8 @@ function handleOpenStore(prev: GameState, season?: Season): ActionResult {
 }
 
 function handleNextWeek(prev: GameState): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '推进周');
+  if (phaseGuard) return phaseGuard;
   const { state } = weeklyTick(prev);
   return ok(state);
 }
@@ -549,6 +575,8 @@ function handleRestart(): ActionResult {
 // ============ 营销活动 Handlers ============
 
 function handleStartMarketing(prev: GameState, activityId: string): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '营销活动');
+  if (phaseGuard) return phaseGuard;
   const config = getActivityConfig(activityId);
   if (!config) return fail(prev, `Activity not found: ${activityId}`);
   if (prev.activeMarketingActivities.some(a => a.id === activityId)) return fail(prev, 'Already active');
@@ -578,6 +606,8 @@ function handleStartMarketing(prev: GameState, activityId: string): ActionResult
 }
 
 function handleStopMarketing(prev: GameState, activityId: string): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '营销活动');
+  if (phaseGuard) return phaseGuard;
   const activity = prev.activeMarketingActivities.find(a => a.id === activityId);
   if (!activity) return fail(prev, `Activity not found: ${activityId}`);
   const penalty = calculateStopPenalty(activity.dependencyCoefficient, activity.activeWeeks);
@@ -607,14 +637,17 @@ function handleSetProductPrice(prev: GameState, productId: string, price: number
 }
 
 function handleSetProductInventory(prev: GameState, productId: string, quantity: number): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '库存设置');
+  if (phaseGuard) return phaseGuard;
   if (prev.cognition.level < 1) return fail(prev, 'Cognition level too low for inventory ops');
+  if (!Number.isFinite(quantity)) return fail(prev, '库存数量必须为有限数值');
   const product = prev.selectedProducts.find(p => p.id === productId);
   if (!product) return fail(prev, `Product not found: ${productId}`);
 
   const unitCost = product.baseCost * getEffectiveSupplyCostModifier(prev);
   const existing = prev.inventoryState.items.find(i => i.productId === productId);
   const currentQty = existing?.quantity || 0;
-  const newQty = Math.max(0, quantity);
+  const newQty = Math.max(0, Math.round(quantity));
   const delta = newQty - currentQty;
 
   let purchaseCost = 0;
@@ -648,6 +681,8 @@ function handleSetProductInventory(prev: GameState, productId: string, quantity:
 // ============ 补货策略 & 员工任务 Handlers ============
 
 function handleSetRestockStrategy(prev: GameState, productId: string, strategy: import('@/types/game').RestockStrategy): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '补货策略设置');
+  if (phaseGuard) return phaseGuard;
   if (prev.cognition.level < 1) return fail(prev, 'Cognition level too low for inventory ops');
   return ok({
     ...prev,
@@ -662,6 +697,8 @@ function handleSetRestockStrategy(prev: GameState, productId: string, strategy: 
 }
 
 function handleAssignStaffTask(prev: GameState, staffId: string, taskType: string): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '岗位分配');
+  if (phaseGuard) return phaseGuard;
   const staff = prev.staff.find(s => s.id === staffId);
   if (!staff) return fail(prev, `Staff not found: ${staffId}`);
   if (staff.assignedTask === taskType) return fail(prev, 'Already on this task');
@@ -703,10 +740,13 @@ function handleAssignStaffTask(prev: GameState, staffId: string, taskType: strin
 }
 
 function handleSetStaffWorkHours(prev: GameState, staffId: string, days: number, hours: number): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '工时设置');
+  if (phaseGuard) return phaseGuard;
+  if (!Number.isFinite(days) || !Number.isFinite(hours)) return fail(prev, '工时必须为有限数值');
   const staff = prev.staff.find(s => s.id === staffId);
   if (!staff) return fail(prev, `Staff not found: ${staffId}`);
-  const clampedDays = Math.max(5, Math.min(7, days));
-  const clampedHours = Math.max(4, Math.min(12, hours));
+  const clampedDays = Math.max(5, Math.min(7, Math.round(days)));
+  const clampedHours = Math.max(4, Math.min(12, Math.round(hours)));
 
   // 时薪制员工：工时变更同步更新薪资
   const staffType = staffTypes.find(s => s.id === staff.typeId);
@@ -730,6 +770,8 @@ function handleSetStaffWorkHours(prev: GameState, staffId: string, days: number,
 // ============ 认知 & 周总结 Handlers ============
 
 function handleConsultYongGe(prev: GameState): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '勇哥咨询');
+  if (phaseGuard) return phaseGuard;
   const times = prev.cognition.consultYongGeThisWeek || 0;
   if (times >= PASSIVE_EXP_CONFIG.consultYongGeWeeklyLimit) return fail(prev, 'Weekly consult limit reached');
   if (prev.cash < PASSIVE_EXP_CONFIG.consultYongGeCost) return fail(prev, 'Not enough cash');
@@ -763,7 +805,10 @@ function handleClearLastWeekEvent(prev: GameState): ActionResult {
 // ============ v2.7 员工系统升级 Handlers ============
 
 function handleSetStaffSalary(prev: GameState, staffId: string, newSalary: number): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '薪资调整');
+  if (phaseGuard) return phaseGuard;
   if (prev.cognition.level < 2) return fail(prev, '认知等级不足，需要达到觉醒新手(Lv2)才能调整薪资');
+  if (!Number.isFinite(newSalary)) return fail(prev, '薪资必须为有限数值');
   const staff = prev.staff.find(s => s.id === staffId);
   if (!staff) return fail(prev, `Staff not found: ${staffId}`);
 
@@ -820,6 +865,8 @@ function handleStaffMoraleAction(
   targetStaffId?: string,
   bonusAmount?: number,
 ): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '士气管理');
+  if (phaseGuard) return phaseGuard;
   const config = MORALE_ACTION_CONFIG[actionType];
   if (prev.cognition.level < config.minCognitionLevel) {
     return fail(prev, '认知等级不足，需要达到踩坑学徒(Lv1)才能使用士气管理工具');
@@ -921,6 +968,8 @@ function handleStaffMoraleAction(
 }
 
 function handleRetainStaff(prev: GameState, staffId: string, method: 'raise' | 'reduce_hours' | 'bonus'): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '员工挽留');
+  if (phaseGuard) return phaseGuard;
   const retainConfig = RETENTION_CONFIG[method];
   if (prev.cognition.level < retainConfig.minCognitionLevel) {
     return fail(prev, '认知等级不足，需要达到觉醒新手(Lv2)才能挽留员工');
@@ -989,6 +1038,8 @@ function handleRetainStaff(prev: GameState, staffId: string, method: 'raise' | '
 // ============ v2.8 产品专注度 Handler ============
 
 function handleSetStaffFocusProduct(prev: GameState, staffId: string, productId: string | null): ActionResult {
+  const phaseGuard = requireOperatingPhase(prev, '产品专注设置');
+  if (phaseGuard) return phaseGuard;
   const staff = prev.staff.find(s => s.id === staffId);
   if (!staff) return fail(prev, `Staff not found: ${staffId}`);
 
