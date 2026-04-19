@@ -14,24 +14,32 @@ import type {
   WeeklySummary,
   NearbyShopEvent,
   InteractiveGameEvent,
-} from '@/types/game';
-import { calculateSupplyDemand } from '@/lib/supplyDemand';
+} from "@/types/game";
+import { calculateSupplyDemand } from "@/lib/supplyDemand";
 import {
   tryGenerateNewShop,
   checkShopClosing,
   updateShopPrices,
   updateShopProfits,
-} from '@/lib/nearbyShopGenerator';
-import { assignNearbyShopsToConsumerRings, applySeasonalTrafficVariation } from '@/lib/consumerRingGenerator';
-import { rollInteractiveEvent, applyEventEffects } from '@/lib/eventEngine';
-import { INTERACTIVE_EVENTS } from '@/data/interactiveEvents';
+} from "@/lib/nearbyShopGenerator";
+import {
+  assignNearbyShopsToConsumerRings,
+  applySeasonalTrafficVariation,
+} from "@/lib/consumerRingGenerator";
+import { rollInteractiveEvent, applyEventEffects } from "@/lib/eventEngine";
+import { INTERACTIVE_EVENTS } from "@/data/interactiveEvents";
 import {
   staffTypes,
   gameEvents,
   MONTHLY_MARKETING_COST,
   EQUIPMENT_DEPRECIATION,
-} from '@/data/gameData';
-import { COGNITION_LEVELS, PASSIVE_EXP_CONFIG, MISTAKE_EXP_TABLE, applyCognitionExp } from '@/data/cognitionData';
+} from "@/data/gameData";
+import {
+  COGNITION_LEVELS,
+  PASSIVE_EXP_CONFIG,
+  MISTAKE_EXP_TABLE,
+  applyCognitionExp,
+} from "@/data/cognitionData";
 import {
   PROMOTION_TIERS,
   INITIAL_PLATFORM_RATING,
@@ -39,35 +47,39 @@ import {
   RATING_GROWTH_CONFIG,
   calculatePlatformWeightScore,
   getPackagingTier,
-} from '@/data/deliveryData';
+} from "@/data/deliveryData";
 import {
   getWasteRate,
   calculateHoldingCost,
   calculateRestockQuantity,
   getStockoutEffect,
-} from '@/data/inventoryData';
-import { getStaffFatigueEffect, getMoraleEffect, getTaskDefinition } from '@/data/staffData';
+} from "@/data/inventoryData";
+import {
+  getStaffFatigueEffect,
+  getMoraleEffect,
+  getTaskDefinition,
+} from "@/data/staffData";
 import {
   getActivityConfig,
   calculateActivityEffectDecay,
   getLocationExposureFloor,
   DEPENDENCY_CONFIG,
-} from '@/data/marketingData';
+} from "@/data/marketingData";
 import {
   calculateWeeklyExp,
   getSkillUpgradeRequirement,
   calculateFatigueGain,
   calculateWorkHoursMoraleEffect,
-} from '@/data/staffData';
-import { diagnoseHealth } from '@/lib/healthCheck';
+} from "@/data/staffData";
+import { diagnoseHealth } from "@/lib/healthCheck";
 import {
   getBossActionConfig,
   INVESTIGATION_DIMENSIONS,
   generateInvestigationResult,
   generateTrafficCountResult,
   generateDinnerInsight,
-} from '@/data/bossActionData';
-import type { InvestigationDimension } from '@/types/game';
+} from "@/data/bossActionData";
+import type { InvestigationDimension } from "@/types/game";
 
 // ============ 常量 ============
 
@@ -75,27 +87,49 @@ export const INITIAL_CASH = 400000; // 初始资金40万（原30万，给加盟�
 export const WIN_STREAK = 6; // 连续盈利6周即胜利
 export const WIN_EXPOSURE = 35;
 export const WIN_REPUTATION = 55;
-export const MIN_OPERATING_CASH = -5000; // 允许小额透支缓冲，减少早期“猝死”式破产
+export const MIN_OPERATING_CASH = -5000; // 允许小额透支缓冲（基础下限，筹备阶段用）
+
+/**
+ * 计算"动态破产线"：
+ * 现实中餐饮老板扛不住欠工资 + 半月房租的透支。
+ * 使用 max(基础下限, 周薪资负值, 半月租金负值)，取更严格（更高）的下限
+ * 返回值为"允许的最低现金"，低于即判定破产。
+ */
+export function calculateMinOperatingCash(state: GameState): number {
+  const fc = calculateFixedCostBreakdown(state);
+  const weeklyPayroll = fc.salary; // 周薪资
+  const halfMonthRent = fc.rent * 2; // 半月房租（rent 已是周值 × 2 ≈ 半月）
+  // 取（基础下限、周薪资、半月租金）中最严格（最大负值）
+  const dynamicFloor = -Math.max(
+    Math.abs(MIN_OPERATING_CASH),
+    Math.abs(weeklyPayroll),
+    Math.abs(halfMonthRent),
+  );
+  return dynamicFloor;
+}
 
 // 快招品牌蜜月期配置
 export const QUICK_FRANCHISE_HONEYMOON = {
-  weeks: 8,                    // 蜜月期8周
-  supplyCostMultiplier: 1.0,   // 蜜月期供货成本正常（之后才暴露真实成本）
-  fakeReputationBoost: 3,      // 蜜月期每周虚假口碑加成（总部刷单）
+  weeks: 8, // 蜜月期8周
+  supplyCostMultiplier: 1.0, // 蜜月期供货成本正常（之后才暴露真实成本）
+  fakeReputationBoost: 3, // 蜜月期每周虚假口碑加成（总部刷单）
 };
 
 // ============ 工具函数 ============
 
 /** 根据月份获取季节 */
 export const getSeasonFromMonth = (month: number): Season => {
-  if (month >= 3 && month <= 5) return 'spring';
-  if (month >= 6 && month <= 8) return 'summer';
-  if (month >= 9 && month <= 11) return 'autumn';
-  return 'winter';
+  if (month >= 3 && month <= 5) return "spring";
+  if (month >= 6 && month <= 8) return "summer";
+  if (month >= 9 && month <= 11) return "autumn";
+  return "winter";
 };
 
 /** 根据周数计算当前月份 */
-export const getCurrentMonth = (startMonth: number, weeksPassed: number): number => {
+export const getCurrentMonth = (
+  startMonth: number,
+  weeksPassed: number,
+): number => {
   const monthsPassed = Math.floor(weeksPassed / 4);
   return ((startMonth - 1 + monthsPassed) % 12) + 1;
 };
@@ -130,8 +164,8 @@ export function getEffectiveSupplyCostModifier(state: GameState): number {
   // 叠加 activeBuffs 中的 supply_cost_reduction（饭局获得的进货折扣）
   const buffs = state.bossAction?.activeBuffs ?? [];
   for (const buff of buffs) {
-    if (buff.type === 'supply_cost_reduction') {
-      modifier *= (1 - buff.value);
+    if (buff.type === "supply_cost_reduction") {
+      modifier *= 1 - buff.value;
     }
   }
   return modifier;
@@ -143,24 +177,47 @@ export interface FixedCostBreakdown {
   rent: number;
   salary: number;
   utilities: number;
-  marketing: number;
+  marketing: number; // 基础品牌维护费（门头、传单常备）
   depreciation: number;
-  promotion: number;  // 外卖推广费（由调用方注入，base 函数返回 0）
+  promotion: number; // 外卖推广费（由调用方注入，base 函数返回 0）
+  holding: number; // 库存持有成本（管理会计中属期间费用，与销量无直接关系）
+  activityMarketing: number; // 期间性营销活动费用（独立营销事件成本，非销量挂钩）
   total: number;
 }
 
 /** 计算每周固定成本明细（含隐性成本） */
-export function calculateFixedCostBreakdown(state: GameState): FixedCostBreakdown {
-  const empty: FixedCostBreakdown = { rent: 0, salary: 0, utilities: 0, marketing: 0, depreciation: 0, promotion: 0, total: 0 };
+export function calculateFixedCostBreakdown(
+  state: GameState,
+): FixedCostBreakdown {
+  const empty: FixedCostBreakdown = {
+    rent: 0,
+    salary: 0,
+    utilities: 0,
+    marketing: 0,
+    depreciation: 0,
+    promotion: 0,
+    holding: 0,
+    activityMarketing: 0,
+    total: 0,
+  };
   if (!state.selectedLocation || !state.selectedDecoration) return empty;
 
   const area = state.selectedAddress?.area || state.storeArea;
   const rentModifier = state.selectedAddress?.rentModifier || 1;
 
-  const seasonRentMultiplier = state.selectedLocation.type === 'tourist'
-    ? (state.currentSeason === 'summer' ? 1.0 : state.currentSeason === 'winter' ? 0.75 : 0.85)
-    : 1.0;
-  const monthlyRent = state.selectedLocation.rentPerSqm * area * rentModifier * seasonRentMultiplier;
+  const seasonRentMultiplier =
+    state.selectedLocation.type === "tourist"
+      ? state.currentSeason === "summer"
+        ? 1.0
+        : state.currentSeason === "winter"
+          ? 0.75
+          : 0.85
+      : 1.0;
+  const monthlyRent =
+    state.selectedLocation.rentPerSqm *
+    area *
+    rentModifier *
+    seasonRentMultiplier;
   const rent = monthlyRent / 4;
 
   const monthlySalary = state.staff.reduce((sum, s) => sum + s.salary, 0);
@@ -170,6 +227,24 @@ export function calculateFixedCostBreakdown(state: GameState): FixedCostBreakdow
   const marketing = MONTHLY_MARKETING_COST / 4;
   const depreciation = EQUIPMENT_DEPRECIATION / 4;
 
+  // 库存持有成本：管理会计口径属期间费用（仓储/资金成本），不应计入变动成本
+  const holding = state.inventoryState?.weeklyHoldingCost ?? 0;
+
+  // 营销活动费用：按期间发生，属"销售费用"科目，不应计入变动成本
+  let activityMarketing = 0;
+  (state.activeMarketingActivities || []).forEach((activity) => {
+    const config = getActivityConfig(activity.id);
+    if (config) activityMarketing += config.baseCost;
+  });
+
+  const total =
+    rent +
+    salary +
+    utilities +
+    marketing +
+    depreciation +
+    holding +
+    activityMarketing;
   return {
     rent,
     salary,
@@ -177,7 +252,9 @@ export function calculateFixedCostBreakdown(state: GameState): FixedCostBreakdow
     marketing,
     depreciation,
     promotion: 0,
-    total: rent + salary + utilities + marketing + depreciation,
+    holding,
+    activityMarketing,
+    total,
   };
 }
 
@@ -191,8 +268,8 @@ export function calculateWeeklyPromotionCost(state: GameState): number {
   let total = 0;
   if (state.deliveryState && state.deliveryState.platforms.length > 0) {
     for (const ap of state.deliveryState.platforms) {
-      if (ap.promotionTierId !== 'none') {
-        const tier = PROMOTION_TIERS.find(t => t.id === ap.promotionTierId);
+      if (ap.promotionTierId !== "none") {
+        const tier = PROMOTION_TIERS.find((t) => t.id === ap.promotionTierId);
         if (tier) total += tier.weeklyCost;
       }
     }
@@ -201,22 +278,29 @@ export function calculateWeeklyPromotionCost(state: GameState): number {
 }
 
 /** 计算变动成本（含加盟抽成、平台抽成、损耗 - 使用详细损耗率） */
-export function calculateVariableCost(revenue: number, state: GameState, sdResult?: SupplyDemandResult): number {
+export function calculateVariableCost(
+  revenue: number,
+  state: GameState,
+  sdResult?: SupplyDemandResult,
+): number {
   if (state.selectedProducts.length === 0) return 0;
 
   const supplyCostModifier = getEffectiveSupplyCostModifier(state);
 
   // 平均成本率（库存持有成本计算也需要）
-  const avgCostRate = state.selectedProducts.reduce((sum, p) => {
-    const modifiedCost = p.baseCost * supplyCostModifier;
-    return sum + (modifiedCost / p.basePrice);
-  }, 0) / state.selectedProducts.length;
+  const avgCostRate =
+    state.selectedProducts.reduce((sum, p) => {
+      const modifiedCost = p.baseCost * supplyCostModifier;
+      return sum + modifiedCost / p.basePrice;
+    }, 0) / state.selectedProducts.length;
 
   // 基础变动成本：优先使用实际销量 × 单位成本
   let baseCost: number;
   if (sdResult && sdResult.productSales.length > 0) {
     baseCost = sdResult.productSales.reduce((sum, sale) => {
-      const product = state.selectedProducts.find(p => p.id === sale.productId);
+      const product = state.selectedProducts.find(
+        (p) => p.id === sale.productId,
+      );
       if (!product) return sum;
       return sum + sale.actualSales * product.baseCost * supplyCostModifier;
     }, 0);
@@ -233,34 +317,75 @@ export function calculateVariableCost(revenue: number, state: GameState, sdResul
   const deliveryCommission = sdResult?.deliveryCommission || 0;
   const deliveryPackageCost = sdResult?.deliveryPackageCost || 0;
 
-  // ============ 损耗与持有成本 ============
+  // ============ 损耗成本（变动：随销量/库存波动） ============
+  // 注：库存持有成本(holdingCost) 和 营销活动费(marketingCost) 已迁入固定成本（calculateFixedCostBreakdown），
+  // 符合管理会计"期间费用不随销量波动"的口径，避免污染贡献毛益率与盈亏平衡点计算。
   let wasteCost = 0;
-  let holdingCost = 0;
   if (state.inventoryState.items.length > 0) {
     wasteCost = state.inventoryState.weeklyWasteCost;
-    holdingCost = state.inventoryState.weeklyHoldingCost;
   } else {
-    state.selectedProducts.forEach(product => {
-      const wasteRate = getWasteRate(product.storageType as 'normal' | 'refrigerated' | 'frozen');
+    state.selectedProducts.forEach((product) => {
+      const wasteRate = getWasteRate(
+        product.storageType as "normal" | "refrigerated" | "frozen",
+      );
       const productRevenue = revenue / state.selectedProducts.length;
       wasteCost += productRevenue * wasteRate;
-      const productValue = productRevenue * avgCostRate;
-      holdingCost += calculateHoldingCost(productValue, product.storageType);
     });
   }
 
-  // ============ 营销活动成本 ============
-  let marketingCost = 0;
-  state.activeMarketingActivities.forEach(activity => {
-    const config = getActivityConfig(activity.id);
-    if (config) {
-      marketingCost += config.baseCost;
-    }
-  });
-
   // 注意：deliveryDiscountCost 不计入变动成本，因为 deliveryRevenue 已经是顾客实付金额（menuPrice × (1-subsidyRate)），
   // 满减补贴已体现在更低的收入中。deliveryDiscountCost 仅用于 UI 展示和勇哥诊断上下文。
-  return baseCost + franchiseFee + deliveryCommission + deliveryPackageCost + wasteCost + holdingCost + marketingCost;
+  return (
+    baseCost +
+    franchiseFee +
+    deliveryCommission +
+    deliveryPackageCost +
+    wasteCost
+  );
+}
+
+/**
+ * 计算销售成本（COGS）— 仅包含产品原材料（含品牌供货加成）+ 损耗
+ * 用于管理会计口径的"真·毛利率" = (Revenue - COGS) / Revenue
+ */
+export function calculateCOGS(
+  revenue: number,
+  state: GameState,
+  sdResult?: SupplyDemandResult,
+): number {
+  if (state.selectedProducts.length === 0) return 0;
+  const supplyCostModifier = getEffectiveSupplyCostModifier(state);
+
+  let baseCost: number;
+  if (sdResult && sdResult.productSales.length > 0) {
+    baseCost = sdResult.productSales.reduce((sum, sale) => {
+      const product = state.selectedProducts.find(
+        (p) => p.id === sale.productId,
+      );
+      if (!product) return sum;
+      return sum + sale.actualSales * product.baseCost * supplyCostModifier;
+    }, 0);
+  } else {
+    const avgCostRate =
+      state.selectedProducts.reduce((sum, p) => {
+        return sum + (p.baseCost * supplyCostModifier) / p.basePrice;
+      }, 0) / state.selectedProducts.length;
+    baseCost = revenue * avgCostRate;
+  }
+
+  let wasteCost = 0;
+  if (state.inventoryState.items.length > 0) {
+    wasteCost = state.inventoryState.weeklyWasteCost;
+  } else {
+    state.selectedProducts.forEach((product) => {
+      const wasteRate = getWasteRate(
+        product.storageType as "normal" | "refrigerated" | "frozen",
+      );
+      const productRevenue = revenue / state.selectedProducts.length;
+      wasteCost += productRevenue * wasteRate;
+    });
+  }
+  return baseCost + wasteCost;
 }
 
 // ============ 初始游戏状态 ============
@@ -271,7 +396,7 @@ export function createInitialGameState(): GameState {
     currentWeek: 0,
     totalWeeks: 52,
     consecutiveProfits: 0,
-    gamePhase: 'setup',
+    gamePhase: "setup",
     gameOverReason: null,
     selectedBrand: null,
     selectedLocation: null,
@@ -309,7 +434,7 @@ export function createInitialGameState(): GameState {
     productsLocked: false,
     decorationCostMarkup: 1.0,
     // 季节与时间机制
-    currentSeason: 'spring',
+    currentSeason: "spring",
     startMonth: 3,
     // 周边店铺系统
     nearbyShops: [],
@@ -329,10 +454,10 @@ export function createInitialGameState(): GameState {
       weeklyDiscountCost: 0,
     },
     // 出餐分配优先级
-    supplyPriority: 'dine_in_first',
+    supplyPriority: "dine_in_first",
     // 老板周行动系统
     bossAction: {
-      currentAction: 'supervise' as const,
+      currentAction: "supervise" as const,
       workRole: undefined,
       consecutiveStudyWeeks: 0,
       benchmarkCooldown: 0,
@@ -405,8 +530,12 @@ export function weeklyTick(prev: GameState): {
   // ============ v3.1: 处理到期的延迟效果 ============
   const delayedEffectNarratives: string[] = [];
   let stateAfterDelayed = prev;
-  const dueEffects = (prev.pendingDelayedEffects || []).filter(de => de.executeAtWeek <= newWeek);
-  const remainingDelayed = (prev.pendingDelayedEffects || []).filter(de => de.executeAtWeek > newWeek);
+  const dueEffects = (prev.pendingDelayedEffects || []).filter(
+    (de) => de.executeAtWeek <= newWeek,
+  );
+  const remainingDelayed = (prev.pendingDelayedEffects || []).filter(
+    (de) => de.executeAtWeek > newWeek,
+  );
 
   if (dueEffects.length > 0) {
     let tempState = { ...prev, pendingDelayedEffects: remainingDelayed };
@@ -422,28 +551,38 @@ export function weeklyTick(prev: GameState): {
   }
 
   // ============ v3.1: 处理到期的链式事件 ============
-  const dueChains = (stateAfterDelayed.pendingChainEvents || []).filter(ce => ce.triggerAtWeek <= newWeek);
-  const remainingChains = (stateAfterDelayed.pendingChainEvents || []).filter(ce => ce.triggerAtWeek > newWeek);
+  const dueChains = (stateAfterDelayed.pendingChainEvents || []).filter(
+    (ce) => ce.triggerAtWeek <= newWeek,
+  );
+  const remainingChains = (stateAfterDelayed.pendingChainEvents || []).filter(
+    (ce) => ce.triggerAtWeek > newWeek,
+  );
   let chainTriggeredEvent: InteractiveGameEvent | null = null;
 
   for (const ce of dueChains) {
     if (Math.random() < ce.probability) {
       // 从 INTERACTIVE_EVENTS 中查找链式事件（链式事件不受去重限制）
-      const chainEvent = INTERACTIVE_EVENTS.find(e => e.id === ce.eventId);
+      const chainEvent = INTERACTIVE_EVENTS.find((e) => e.id === ce.eventId);
       if (chainEvent && !stateAfterDelayed.pendingInteractiveEvent) {
         chainTriggeredEvent = chainEvent;
         break; // 每周最多触发一个链式事件
       }
     }
   }
-  stateAfterDelayed = { ...stateAfterDelayed, pendingChainEvents: remainingChains };
+  stateAfterDelayed = {
+    ...stateAfterDelayed,
+    pendingChainEvents: remainingChains,
+  };
 
   // ============ v3.1: 递减事件 buff 持续时间，移除过期 buff ============
   const updatedEventBuffs = (stateAfterDelayed.activeEventBuffs || [])
-    .map(b => ({ ...b, durationWeeks: b.durationWeeks - 1 }))
-    .filter(b => b.durationWeeks > 0);
-  const activeBuffSummaries = updatedEventBuffs.map(b => b.source);
-  stateAfterDelayed = { ...stateAfterDelayed, activeEventBuffs: updatedEventBuffs };
+    .map((b) => ({ ...b, durationWeeks: b.durationWeeks - 1 }))
+    .filter((b) => b.durationWeeks > 0);
+  const activeBuffSummaries = updatedEventBuffs.map((b) => b.source);
+  stateAfterDelayed = {
+    ...stateAfterDelayed,
+    activeEventBuffs: updatedEventBuffs,
+  };
 
   // 用处理后的 state 替代 prev 继续后续计算
   const prevWithEffects = stateAfterDelayed;
@@ -453,7 +592,9 @@ export function weeklyTick(prev: GameState): {
   const newSeason = getSeasonFromMonth(currentMonth);
 
   // ============ v3 增长系统：曝光存量 + 营销脉冲 + 口碑置信 ============
-  const locationFloor = getLocationExposureFloor(prevWithEffects.selectedAddress?.trafficModifier || 1);
+  const locationFloor = getLocationExposureFloor(
+    prevWithEffects.selectedAddress?.trafficModifier || 1,
+  );
   const fallbackLaunch = clamp(prevWithEffects.currentWeek * 4 + 8, 0, 100);
   const prevGrowth = prevWithEffects.growthSystem ?? {
     launchProgress: fallbackLaunch,
@@ -473,44 +614,59 @@ export function weeklyTick(prev: GameState): {
   const delayedExposureDelta = prevWithEffects.exposure - prev.exposure;
 
   // 存量/脉冲自然衰减：存量慢衰、脉冲快衰
-  awarenessStock = Math.max(locationFloor, awarenessStock - Math.max(0.35, awarenessStock * 0.02));
+  awarenessStock = Math.max(
+    locationFloor,
+    awarenessStock - Math.max(0.35, awarenessStock * 0.02),
+  );
   campaignPulse *= 0.58;
 
   // 口碑自然回归（比旧版更强），防止长期无成本维持高分
-  newReputation = Math.max(DEPENDENCY_CONFIG.reputationFloor, newReputation - 0.35);
+  newReputation = Math.max(
+    DEPENDENCY_CONFIG.reputationFloor,
+    newReputation - 0.35,
+  );
 
   let campaignPulseGain = 0;
   let trustGainFromActivities = 0;
   let launchGainFromActivities = 0;
 
   // Step 1: 营销活动改为主要作用在“脉冲/信任”，不再直接给需求硬加成
-  prevWithEffects.activeMarketingActivities.forEach(activity => {
+  prevWithEffects.activeMarketingActivities.forEach((activity) => {
     const config = getActivityConfig(activity.id);
     if (!config) return;
 
-    const decay = config.type === 'continuous'
-      ? calculateActivityEffectDecay(activity.activeWeeks, config.dependencyCoefficient)
-      : 1;
-    const duration = config.type === 'one_time' ? (config.maxDuration || 1) : 1;
+    const decay =
+      config.type === "continuous"
+        ? calculateActivityEffectDecay(
+            activity.activeWeeks,
+            config.dependencyCoefficient,
+          )
+        : 1;
+    const duration = config.type === "one_time" ? config.maxDuration || 1 : 1;
     const exposureGain = (config.exposureBoost * decay) / duration;
     const trustGain = (config.reputationBoost * decay) / duration;
 
     // 曝光类更偏脉冲；混合类会有少量沉淀到存量
-    const pulseWeight = config.category === 'exposure' ? 1.0 : 0.75;
+    const pulseWeight = config.category === "exposure" ? 1.0 : 0.75;
     campaignPulseGain += Math.max(0, exposureGain) * pulseWeight;
-    awarenessStock += Math.max(0, exposureGain) * (config.category === 'both' ? 0.08 : 0.04);
+    awarenessStock +=
+      Math.max(0, exposureGain) * (config.category === "both" ? 0.08 : 0.04);
 
     trustGainFromActivities += trustGain * 0.55;
-    launchGainFromActivities += Math.max(0, exposureGain * 0.12 + trustGain * 0.2);
+    launchGainFromActivities += Math.max(
+      0,
+      exposureGain * 0.12 + trustGain * 0.2,
+    );
   });
 
   // Step 1.5: 营销员贡献（线上线下都有，但偏脉冲）
   const MARKETER_EXPOSURE_RATE = 2.2;
   let marketerExposureBoost = 0;
-  prevWithEffects.staff.forEach(s => {
-    if (s.isOnboarding || s.assignedTask !== 'marketer') return;
+  prevWithEffects.staff.forEach((s) => {
+    if (s.isOnboarding || s.assignedTask !== "marketer") return;
     const hours = s.workDaysPerWeek * s.workHoursPerDay;
-    marketerExposureBoost += s.efficiency * (hours / 48) * MARKETER_EXPOSURE_RATE;
+    marketerExposureBoost +=
+      s.efficiency * (hours / 48) * MARKETER_EXPOSURE_RATE;
   });
   campaignPulseGain += marketerExposureBoost;
   awarenessStock += marketerExposureBoost * 0.12;
@@ -533,13 +689,20 @@ export function weeklyTick(prev: GameState): {
   newReputation += trustGainFromActivities * confidenceGainFactor;
 
   // Step 2.5: 快招品牌蜜月期虚假口碑加成（保留，但缩小并随周次衰减）
-  if (prevWithEffects.selectedBrand?.isQuickFranchise && newWeek <= QUICK_FRANCHISE_HONEYMOON.weeks) {
-    const remainingRatio = (QUICK_FRANCHISE_HONEYMOON.weeks - newWeek + 1) / QUICK_FRANCHISE_HONEYMOON.weeks;
-    newReputation += QUICK_FRANCHISE_HONEYMOON.fakeReputationBoost * 0.45 * remainingRatio;
+  if (
+    prevWithEffects.selectedBrand?.isQuickFranchise &&
+    newWeek <= QUICK_FRANCHISE_HONEYMOON.weeks
+  ) {
+    const remainingRatio =
+      (QUICK_FRANCHISE_HONEYMOON.weeks - newWeek + 1) /
+      QUICK_FRANCHISE_HONEYMOON.weeks;
+    newReputation +=
+      QUICK_FRANCHISE_HONEYMOON.fakeReputationBoost * 0.45 * remainingRatio;
   }
 
   // 本周供需计算前的曝光值（由存量+脉冲+少量复购口碑外溢构成）
-  let newExposure = awarenessStock + campaignPulse + Math.max(0, (repeatIntent - 50) * 0.12);
+  let newExposure =
+    awarenessStock + campaignPulse + Math.max(0, (repeatIntent - 50) * 0.12);
   newExposure = clamp(newExposure, locationFloor, 100);
 
   // 周边店铺动态更新
@@ -548,16 +711,20 @@ export function weeklyTick(prev: GameState): {
 
   // 尝试新开店
   const rentBase = prevWithEffects.selectedLocation
-    ? prevWithEffects.selectedLocation.rentPerSqm * (prevWithEffects.selectedAddress?.rentModifier || 1) * (prevWithEffects.selectedAddress?.area || 30)
+    ? prevWithEffects.selectedLocation.rentPerSqm *
+      (prevWithEffects.selectedAddress?.rentModifier || 1) *
+      (prevWithEffects.selectedAddress?.area || 30)
     : 3000;
   const newShop = tryGenerateNewShop(
-    prevWithEffects.selectedLocation?.type || 'community',
-    updatedNearbyShops, newWeek, rentBase
+    prevWithEffects.selectedLocation?.type || "community",
+    updatedNearbyShops,
+    newWeek,
+    rentBase,
   );
   if (newShop) {
     updatedNearbyShops = [...updatedNearbyShops, newShop];
     shopEvents.push({
-      type: 'new_open',
+      type: "new_open",
       shopId: newShop.id,
       shopName: newShop.name,
       description: `新店「${newShop.name}」在附近开业了！`,
@@ -572,18 +739,25 @@ export function weeklyTick(prev: GameState): {
 
   // 估算店铺利润
   const areaTotalDemand = prevWithEffects.selectedLocation
-    ? Object.values(prevWithEffects.selectedLocation.footTraffic).reduce((s, v) => s + v, 0)
+    ? Object.values(prevWithEffects.selectedLocation.footTraffic).reduce(
+        (s, v) => s + v,
+        0,
+      )
     : 500;
   updatedNearbyShops = updateShopProfits(updatedNearbyShops, areaTotalDemand);
 
   // 修复 #9：消费者环季节性波动（基于 baseConsumerRings 原始值）
-  const baseRings = prevWithEffects.baseConsumerRings.length > 0
-    ? prevWithEffects.baseConsumerRings
-    : prevWithEffects.consumerRings || [];
-  const seasonAdjustedRings = applySeasonalTrafficVariation(baseRings, newSeason);
+  const baseRings =
+    prevWithEffects.baseConsumerRings.length > 0
+      ? prevWithEffects.baseConsumerRings
+      : prevWithEffects.consumerRings || [];
+  const seasonAdjustedRings = applySeasonalTrafficVariation(
+    baseRings,
+    newSeason,
+  );
   const updatedConsumerRings = assignNearbyShopsToConsumerRings(
     seasonAdjustedRings,
-    updatedNearbyShops
+    updatedNearbyShops,
   );
 
   // 使用更新后的状态计算收入
@@ -616,58 +790,75 @@ export function weeklyTick(prev: GameState): {
     // --- 评分更新（基于订单完成率，冷启动从0增长） ---
     const currentRating = updatedDeliveryState.platformRating;
     const fulfilledOrders = supplyDemandResult.deliverySales;
-    const totalDeliveryDemand = supplyDemandResult.productSales.reduce((sum, ps) => {
-      const dineInDemand = supplyDemandResult.demand.productDemands.find(
-        pd => pd.productId === ps.productId
-      )?.finalDemand || 0;
-      return sum + Math.max(0, ps.demand - dineInDemand);
-    }, 0);
-    const unfulfilledOrders = Math.max(0, totalDeliveryDemand - fulfilledOrders);
+    const totalDeliveryDemand = supplyDemandResult.productSales.reduce(
+      (sum, ps) => {
+        const dineInDemand =
+          supplyDemandResult.demand.productDemands.find(
+            (pd) => pd.productId === ps.productId,
+          )?.finalDemand || 0;
+        return sum + Math.max(0, ps.demand - dineInDemand);
+      },
+      0,
+    );
+    const unfulfilledOrders = Math.max(
+      0,
+      totalDeliveryDemand - fulfilledOrders,
+    );
 
-    let ratingGrowth = fulfilledOrders * RATING_GROWTH_CONFIG.ratingPerFulfilledOrder
-      + unfulfilledOrders * RATING_GROWTH_CONFIG.ratingPerUnfulfilledOrder;
+    let ratingGrowth =
+      fulfilledOrders * RATING_GROWTH_CONFIG.ratingPerFulfilledOrder +
+      unfulfilledOrders * RATING_GROWTH_CONFIG.ratingPerUnfulfilledOrder;
 
     // 食材升级活动加成
     const hasIngredientUpgrade = prevWithEffects.activeMarketingActivities.some(
-      a => a.id === 'ingredient_upgrade'
+      (a) => a.id === "ingredient_upgrade",
     );
-    if (hasIngredientUpgrade) ratingGrowth += RATING_GROWTH_CONFIG.ingredientUpgradeBonus;
+    if (hasIngredientUpgrade)
+      ratingGrowth += RATING_GROWTH_CONFIG.ingredientUpgradeBonus;
 
     // 推广档位评分加成
     let totalRatingBoostFromPromotion = 0;
-    updatedDeliveryState.platforms.forEach(ap => {
-      if (ap.promotionTierId !== 'none') {
-        const tier = PROMOTION_TIERS.find(t => t.id === ap.promotionTierId);
+    updatedDeliveryState.platforms.forEach((ap) => {
+      if (ap.promotionTierId !== "none") {
+        const tier = PROMOTION_TIERS.find((t) => t.id === ap.promotionTierId);
         if (tier) totalRatingBoostFromPromotion += tier.ratingBoost;
       }
       // v3: 精美包装评分加成
       const pkg = getPackagingTier(ap.packagingTierId);
-      if (pkg && pkg.ratingBonus > 0) totalRatingBoostFromPromotion += pkg.ratingBonus;
+      if (pkg && pkg.ratingBonus > 0)
+        totalRatingBoostFromPromotion += pkg.ratingBonus;
     });
     ratingGrowth += totalRatingBoostFromPromotion;
 
     // 自然衰减
     ratingGrowth -= RATING_GROWTH_CONFIG.naturalDecay;
 
-    ratingGrowth = Math.max(-0.5, Math.min(RATING_GROWTH_CONFIG.maxWeeklyGrowth, ratingGrowth));
+    ratingGrowth = Math.max(
+      -0.5,
+      Math.min(RATING_GROWTH_CONFIG.maxWeeklyGrowth, ratingGrowth),
+    );
     const newRating = Math.max(0, Math.min(5.0, currentRating + ratingGrowth));
 
     // --- v3: 权重分计算（替代旧的线性曝光增长） ---
-    const updatedPlatforms = updatedDeliveryState.platforms.map(ap => {
+    const updatedPlatforms = updatedDeliveryState.platforms.map((ap) => {
       const platform = getDeliveryPlatform(ap.platformId);
       if (!platform) return { ...ap, activeWeeks: ap.activeWeeks + 1 };
 
       // 更新滚动4周单量（按平台权重分占比分摊本周总单量）
       const totalWeight = updatedDeliveryState.platforms.reduce(
-        (s, p) => s + Math.max(1, p.platformExposure), 0
+        (s, p) => s + Math.max(1, p.platformExposure),
+        0,
       );
       const platformShare = Math.max(1, ap.platformExposure) / totalWeight;
       const thisWeekOrders = Math.round(fulfilledOrders * platformShare);
-      const recentOrders = [...(ap.recentWeeklyOrders || []), thisWeekOrders].slice(-4);
+      const recentOrders = [
+        ...(ap.recentWeeklyOrders || []),
+        thisWeekOrders,
+      ].slice(-4);
 
       // 推广费用累计
-      if (ap.promotionTierId !== 'none') {
-        const tier = PROMOTION_TIERS.find(t => t.id === ap.promotionTierId);
+      if (ap.promotionTierId !== "none") {
+        const tier = PROMOTION_TIERS.find((t) => t.id === ap.promotionTierId);
         if (tier) weeklyPromotionCostTotal += tier.weeklyCost;
       }
 
@@ -694,7 +885,10 @@ export function weeklyTick(prev: GameState): {
       };
     });
 
-    const totalExposure = updatedPlatforms.reduce((sum, p) => sum + p.platformExposure, 0);
+    const totalExposure = updatedPlatforms.reduce(
+      (sum, p) => sum + p.platformExposure,
+      0,
+    );
 
     updatedDeliveryState = {
       platforms: updatedPlatforms,
@@ -708,14 +902,19 @@ export function weeklyTick(prev: GameState): {
     };
   }
 
-  const variableCost = calculateVariableCost(revenue, updatedState, supplyDemandResult);
+  const variableCost = calculateVariableCost(
+    revenue,
+    updatedState,
+    supplyDemandResult,
+  );
   const fixedCost = calculateWeeklyFixedCost(updatedState);
   // profit 由后续 finalProfit 统一计算（含事件/buff影响）
 
   // 随机事件（12%概率，约每2个月一次，更接近现实）
-  const event = Math.random() > 0.88
-    ? gameEvents[Math.floor(Math.random() * gameEvents.length)]
-    : null;
+  const event =
+    Math.random() > 0.88
+      ? gameEvents[Math.floor(Math.random() * gameEvents.length)]
+      : null;
 
   // 交互式事件抽取（v2.9）：上下文感知，每个事件最多触发一次
   // 注入当前周财务数据，使上下文检查（staff_cost_exceeds_revenue / low_margin）用实时值
@@ -733,11 +932,11 @@ export function weeklyTick(prev: GameState): {
   let eventReputationDelta = 0;
 
   if (event) {
-    if (event.impact.type === 'revenue') {
-      finalRevenue *= (1 + event.impact.value);
-    } else if (event.impact.type === 'cost') {
+    if (event.impact.type === "revenue") {
+      finalRevenue *= 1 + event.impact.value;
+    } else if (event.impact.type === "cost") {
       eventCostExtra = event.impact.value;
-    } else if (event.impact.type === 'reputation') {
+    } else if (event.impact.type === "reputation") {
       eventReputationDelta = event.impact.value;
     }
   }
@@ -748,12 +947,21 @@ export function weeklyTick(prev: GameState): {
     let buffRevenueMultiplier = 1;
     for (const buff of updatedEventBuffs) {
       switch (buff.type) {
-        case 'revenue_multiplier': buffRevenueMultiplier *= (1 + buff.value); break;
-        case 'cost_multiplier': buffCostExtra += variableCost * buff.value; break;
-        case 'demand_boost': buffRevenueMultiplier *= (1 + buff.value); break;
-        case 'supply_reduction': buffRevenueMultiplier *= (1 - buff.value); break;
+        case "revenue_multiplier":
+          buffRevenueMultiplier *= 1 + buff.value;
+          break;
+        case "cost_multiplier":
+          buffCostExtra += variableCost * buff.value;
+          break;
+        case "demand_boost":
+          buffRevenueMultiplier *= 1 + buff.value;
+          break;
+        case "supply_reduction":
+          buffRevenueMultiplier *= 1 - buff.value;
+          break;
         // exposure_weekly / reputation_weekly 在后续对应区块处理
-        default: break;
+        default:
+          break;
       }
     }
     if (buffRevenueMultiplier !== 1) {
@@ -762,15 +970,22 @@ export function weeklyTick(prev: GameState): {
   }
 
   // 统一利润计算（唯一出口，包含所有成本项）
-  let finalProfit = finalRevenue - variableCost - fixedCost
-    - weeklyPromotionCostTotal - buffCostExtra - eventCostExtra;
+  let finalProfit =
+    finalRevenue -
+    variableCost -
+    fixedCost -
+    weeklyPromotionCostTotal -
+    buffCostExtra -
+    eventCostExtra;
 
   // ============ 口碑动态更新（v3：置信度驱动 + 饱和抑制） ============
   let avgFulfillment = 1;
   if (supplyDemandResult.productSales.length > 0) {
-    avgFulfillment = supplyDemandResult.productSales.reduce(
-      (sum, s) => sum + s.fulfillmentRate, 0
-    ) / supplyDemandResult.productSales.length;
+    avgFulfillment =
+      supplyDemandResult.productSales.reduce(
+        (sum, s) => sum + s.fulfillmentRate,
+        0,
+      ) / supplyDemandResult.productSales.length;
   }
 
   const hasSupply = supplyDemandResult.supply.totalSupply > 0;
@@ -779,14 +994,15 @@ export function weeklyTick(prev: GameState): {
   trustConfidence = clamp(
     trustConfidence + confidenceGain - (inactiveWeeks >= 4 ? 0.01 : 0),
     0.08,
-    1
+    1,
   );
 
   let reputationDelta = 0;
   if (hasSupply) {
     // 履约是口碑核心：高履约稳定慢涨，低履约迅速扣分
     const stockoutEffect = getStockoutEffect(avgFulfillment);
-    reputationDelta += stockoutEffect.reputationImpact * (0.55 + trustConfidence * 0.45);
+    reputationDelta +=
+      stockoutEffect.reputationImpact * (0.55 + trustConfidence * 0.45);
 
     if (avgFulfillment >= 0.97) reputationDelta += 0.75;
     else if (avgFulfillment >= 0.9) reputationDelta += 0.35;
@@ -797,10 +1013,14 @@ export function weeklyTick(prev: GameState): {
 
   // 服务质量影响口碑
   const svcStaff = prevWithEffects.staff.filter(
-    s => !s.isOnboarding && ['waiter', 'cleaner', 'manager'].includes(s.assignedTask)
+    (s) =>
+      !s.isOnboarding &&
+      ["waiter", "cleaner", "manager"].includes(s.assignedTask),
   );
   if (svcStaff.length > 0) {
-    const avgSvc = svcStaff.reduce((sum, s) => sum + (s.serviceQuality || 0.8), 0) / svcStaff.length;
+    const avgSvc =
+      svcStaff.reduce((sum, s) => sum + (s.serviceQuality || 0.8), 0) /
+      svcStaff.length;
     if (avgSvc >= 0.92) reputationDelta += 0.45;
     else if (avgSvc >= 0.85) reputationDelta += 0.2;
     if (avgSvc < 0.6) reputationDelta -= 0.9;
@@ -814,11 +1034,11 @@ export function weeklyTick(prev: GameState): {
 
   // 置信度调制 + 高分段饱和抑制（避免轻易双100）
   const confidenceFactor = 0.35 + trustConfidence * 0.65;
-  const positiveSaturation = newReputation > 80
-    ? Math.max(0.2, 1 - (newReputation - 80) / 25)
-    : 1;
+  const positiveSaturation =
+    newReputation > 80 ? Math.max(0.2, 1 - (newReputation - 80) / 25) : 1;
   let weightedReputationDelta = reputationDelta * confidenceFactor;
-  if (weightedReputationDelta > 0) weightedReputationDelta *= positiveSaturation;
+  if (weightedReputationDelta > 0)
+    weightedReputationDelta *= positiveSaturation;
 
   newReputation += weightedReputationDelta;
 
@@ -829,7 +1049,7 @@ export function weeklyTick(prev: GameState): {
 
   // v3.1: 事件 buff 每周口碑修正（不受置信度约束，直接生效）
   for (const buff of updatedEventBuffs) {
-    if (buff.type === 'reputation_weekly') newReputation += buff.value;
+    if (buff.type === "reputation_weekly") newReputation += buff.value;
   }
 
   // 复购意愿：由口碑增量、履约和环境共同驱动
@@ -848,7 +1068,8 @@ export function weeklyTick(prev: GameState): {
   if (hasSupply && avgFulfillment >= 0.92) launchDelta += 1.6;
   if (hasSupply && avgFulfillment < 0.7) launchDelta -= 1.8;
   if (weightedReputationDelta > 0.4) launchDelta += 0.6;
-  if (inactiveWeeks >= 3) launchDelta -= Math.min(2.5, (inactiveWeeks - 2) * 0.5);
+  if (inactiveWeeks >= 3)
+    launchDelta -= Math.min(2.5, (inactiveWeeks - 2) * 0.5);
   launchProgress = clamp(launchProgress + launchDelta, 0, 100);
 
   // 存量与脉冲的后处理：好经营会沉淀存量，差履约会消耗曝光
@@ -866,19 +1087,21 @@ export function weeklyTick(prev: GameState): {
   newExposure = clamp(
     awarenessStock + campaignPulse + Math.max(0, (repeatIntent - 50) * 0.12),
     locationFloor,
-    100
+    100,
   );
 
   // v3.1: 事件 buff 每周曝光修正
   for (const buff of updatedEventBuffs) {
-    if (buff.type === 'exposure_weekly') newExposure = clamp(newExposure + buff.value, locationFloor, 100);
+    if (buff.type === "exposure_weekly")
+      newExposure = clamp(newExposure + buff.value, locationFloor, 100);
   }
   if (delayedExposureDelta !== 0) {
     newExposure = clamp(newExposure + delayedExposureDelta, locationFloor, 100);
   }
 
   // 计算连续盈利周数
-  const newConsecutiveProfits = finalProfit > 0 ? (prev.consecutiveProfits || 0) + 1 : 0;
+  const newConsecutiveProfits =
+    finalProfit > 0 ? (prev.consecutiveProfits || 0) + 1 : 0;
 
   // ============ 认知系统更新（纯被动增长） ============
   let newCognition = { ...prevWithEffects.cognition };
@@ -886,81 +1109,101 @@ export function weeklyTick(prev: GameState): {
 
   // 1. 基础时间经验
   let expGained = PASSIVE_EXP_CONFIG.weeklyBaseExp;
-  expSources.push({ label: '每周基础', exp: PASSIVE_EXP_CONFIG.weeklyBaseExp });
+  expSources.push({ label: "每周基础", exp: PASSIVE_EXP_CONFIG.weeklyBaseExp });
 
   // 2. 经营表现经验
   if (finalProfit > 0) {
     expGained += PASSIVE_EXP_CONFIG.profitWeekBonus;
-    expSources.push({ label: '盈利奖励', exp: PASSIVE_EXP_CONFIG.profitWeekBonus });
+    expSources.push({
+      label: "盈利奖励",
+      exp: PASSIVE_EXP_CONFIG.profitWeekBonus,
+    });
 
     // 2a. 利润规模奖励：每1000元利润额外经验（盈利越多学得越快）
     const profitScaleExp = Math.min(
-      Math.floor(finalProfit / 1000) * PASSIVE_EXP_CONFIG.profitScalePerThousand,
-      PASSIVE_EXP_CONFIG.profitScaleMax
+      Math.floor(finalProfit / 1000) *
+        PASSIVE_EXP_CONFIG.profitScalePerThousand,
+      PASSIVE_EXP_CONFIG.profitScaleMax,
     );
     if (profitScaleExp > 0) {
       expGained += profitScaleExp;
-      expSources.push({ label: '利润规模', exp: profitScaleExp });
+      expSources.push({ label: "利润规模", exp: profitScaleExp });
     }
 
     // 2b. 连续盈利奖励：持续盈利说明经营思路对了
-    if (newConsecutiveProfits >= PASSIVE_EXP_CONFIG.consecutiveProfitThreshold) {
+    if (
+      newConsecutiveProfits >= PASSIVE_EXP_CONFIG.consecutiveProfitThreshold
+    ) {
       expGained += PASSIVE_EXP_CONFIG.consecutiveProfitBonus;
-      expSources.push({ label: '连续盈利', exp: PASSIVE_EXP_CONFIG.consecutiveProfitBonus });
+      expSources.push({
+        label: "连续盈利",
+        exp: PASSIVE_EXP_CONFIG.consecutiveProfitBonus,
+      });
     }
   } else {
     expGained += PASSIVE_EXP_CONFIG.lossWeekExp;
-    expSources.push({ label: '亏损经验', exp: PASSIVE_EXP_CONFIG.lossWeekExp });
+    expSources.push({ label: "亏损经验", exp: PASSIVE_EXP_CONFIG.lossWeekExp });
   }
 
   // 3. 首次遇到该类型事件才给额外经验
   const newEncounteredEventTypes = [...prev.encounteredEventTypes];
   if (event && !prev.encounteredEventTypes.includes(event.id)) {
     expGained += PASSIVE_EXP_CONFIG.firstTimeEvent;
-    expSources.push({ label: '首次事件', exp: PASSIVE_EXP_CONFIG.firstTimeEvent });
+    expSources.push({
+      label: "首次事件",
+      exp: PASSIVE_EXP_CONFIG.firstTimeEvent,
+    });
     newEncounteredEventTypes.push(event.id);
   }
 
   // 4. 操作经验（按周结算）
   const operationExp = Math.min(
-    (prev.cognition.weeklyOperationCount || 0) * PASSIVE_EXP_CONFIG.operationExpPerAction,
-    PASSIVE_EXP_CONFIG.maxOperationExpPerWeek
+    (prev.cognition.weeklyOperationCount || 0) *
+      PASSIVE_EXP_CONFIG.operationExpPerAction,
+    PASSIVE_EXP_CONFIG.maxOperationExpPerWeek,
   );
   expGained += operationExp;
   if (operationExp > 0) {
-    expSources.push({ label: '经营操作', exp: operationExp });
+    expSources.push({ label: "经营操作", exp: operationExp });
   }
 
   // 5. 周边店铺观察经验
   if (shopEvents.length > 0) {
     expGained += PASSIVE_EXP_CONFIG.nearbyShopObserveExp;
-    expSources.push({ label: '商圈观察', exp: PASSIVE_EXP_CONFIG.nearbyShopObserveExp });
+    expSources.push({
+      label: "商圈观察",
+      exp: PASSIVE_EXP_CONFIG.nearbyShopObserveExp,
+    });
   }
 
   // 5b. 老板周行动经验
   {
     const ba = prev.bossAction;
-    const actionConfigs: Record<string, { label: string; expRange: [number, number] }> = {
-      work_in_store: { label: '亲自坐镇', expRange: [5, 5] },
-      supervise: { label: '巡店督导', expRange: [8, 8] },
-      investigate_nearby: { label: '周边考察', expRange: [25, 35] },
-      count_traffic: { label: '蹲点数人头', expRange: [15, 20] },
-      industry_dinner: { label: '同行饭局', expRange: [30, 40] },
+    const actionConfigs: Record<
+      string,
+      { label: string; expRange: [number, number] }
+    > = {
+      work_in_store: { label: "亲自坐镇", expRange: [5, 5] },
+      supervise: { label: "巡店督导", expRange: [8, 8] },
+      investigate_nearby: { label: "周边考察", expRange: [25, 35] },
+      count_traffic: { label: "蹲点数人头", expRange: [15, 20] },
+      industry_dinner: { label: "同行饭局", expRange: [30, 40] },
     };
     const cfg = actionConfigs[ba.currentAction];
     if (cfg) {
       const [min, max] = cfg.expRange;
-      const bossExp = min === max ? min : min + Math.floor(Math.random() * (max - min + 1));
+      const bossExp =
+        min === max ? min : min + Math.floor(Math.random() * (max - min + 1));
       expGained += bossExp;
       expSources.push({ label: cfg.label, exp: bossExp });
     }
     // 蹲点连续奖励
-    if (ba.currentAction === 'count_traffic') {
+    if (ba.currentAction === "count_traffic") {
       const consecutive = (ba.consecutiveStudyWeeks || 0) + 1;
       if (consecutive >= 2) {
         const bonusExp = 20;
         expGained += bonusExp;
-        expSources.push({ label: '蹲点洞察', exp: bonusExp });
+        expSources.push({ label: "蹲点洞察", exp: bonusExp });
       }
     }
   }
@@ -970,37 +1213,59 @@ export function weeklyTick(prev: GameState): {
   const detectedMistakes: string[] = [];
 
   // 快招被骗
-  if (prev.selectedBrand?.isQuickFranchise && !newMistakeHistory.some(m => m.type === 'quick_franchise')) {
-    detectedMistakes.push('quick_franchise');
+  if (
+    prev.selectedBrand?.isQuickFranchise &&
+    !newMistakeHistory.some((m) => m.type === "quick_franchise")
+  ) {
+    detectedMistakes.push("quick_franchise");
   }
   // 库存积压：库存总价值 > 上周收入的 2 倍
-  if (prevWithEffects.inventoryState.totalValue > prev.weeklyRevenue * 2 && prev.weeklyRevenue > 0
-      && !newMistakeHistory.some(m => m.type === 'inventory_overstock')) {
-    detectedMistakes.push('inventory_overstock');
+  if (
+    prevWithEffects.inventoryState.totalValue > prev.weeklyRevenue * 2 &&
+    prev.weeklyRevenue > 0 &&
+    !newMistakeHistory.some((m) => m.type === "inventory_overstock")
+  ) {
+    detectedMistakes.push("inventory_overstock");
   }
   // 现金流断裂：现金 < 0
-  if (prev.cash < 0 && !newMistakeHistory.some(m => m.type === 'cash_flow_break')) {
-    detectedMistakes.push('cash_flow_break');
+  if (
+    prev.cash < 0 &&
+    !newMistakeHistory.some((m) => m.type === "cash_flow_break")
+  ) {
+    detectedMistakes.push("cash_flow_break");
   }
   // 人员超配：周工资 > 周租金的 2 倍
   const weekSalary = prev.staff.reduce((s, st) => s + st.salary, 0) / 4;
   const weekRent = prev.selectedLocation
-    ? (prev.selectedLocation.rentPerSqm * (prev.selectedAddress?.area || prev.storeArea) * (prev.selectedAddress?.rentModifier || 1)) / 4
+    ? (prev.selectedLocation.rentPerSqm *
+        (prev.selectedAddress?.area || prev.storeArea) *
+        (prev.selectedAddress?.rentModifier || 1)) /
+      4
     : 0;
-  if (weekSalary > weekRent * 2 && weekRent > 0 && !newMistakeHistory.some(m => m.type === 'over_staff')) {
-    detectedMistakes.push('over_staff');
+  if (
+    weekSalary > weekRent * 2 &&
+    weekRent > 0 &&
+    !newMistakeHistory.some((m) => m.type === "over_staff")
+  ) {
+    detectedMistakes.push("over_staff");
   }
   // 单品执念：只选了1个产品且已经营3周以上
-  if (prev.selectedProducts.length === 1 && prev.currentWeek >= 3
-      && !newMistakeHistory.some(m => m.type === 'single_product')) {
-    detectedMistakes.push('single_product');
+  if (
+    prev.selectedProducts.length === 1 &&
+    prev.currentWeek >= 3 &&
+    !newMistakeHistory.some((m) => m.type === "single_product")
+  ) {
+    detectedMistakes.push("single_product");
   }
 
-  detectedMistakes.forEach(mistakeId => {
+  detectedMistakes.forEach((mistakeId) => {
     const mistakeConfig = MISTAKE_EXP_TABLE[mistakeId];
     if (mistakeConfig) {
       expGained += mistakeConfig.exp;
-      expSources.push({ label: mistakeConfig.description, exp: mistakeConfig.exp });
+      expSources.push({
+        label: mistakeConfig.description,
+        exp: mistakeConfig.exp,
+      });
       newMistakeHistory.push({
         type: mistakeId,
         exp: mistakeConfig.exp,
@@ -1013,9 +1278,10 @@ export function weeklyTick(prev: GameState): {
   // 更新经验和等级（统一入口）
   const prevCognitionLevel = newCognition.level;
   newCognition = applyCognitionExp(newCognition, expGained);
-  const cognitionLevelUp = newCognition.level > prevCognitionLevel
-    ? { fromLevel: prevCognitionLevel, toLevel: newCognition.level }
-    : null;
+  const cognitionLevelUp =
+    newCognition.level > prevCognitionLevel
+      ? { fromLevel: prevCognitionLevel, toLevel: newCognition.level }
+      : null;
   // 重置每周操作计数和咨询次数
   newCognition.weeklyOperationCount = 0;
   newCognition.consultYongGeThisWeek = 0;
@@ -1025,9 +1291,11 @@ export function weeklyTick(prev: GameState): {
   const newCumulativeProfit = (prev.cumulativeProfit || 0) + finalProfit;
   const meetsReturnRequirement = newCumulativeProfit >= prev.totalInvestment;
   const meetsStreakRequirement = newConsecutiveProfits >= WIN_STREAK;
-  const meetsBrandRequirement = newExposure >= WIN_EXPOSURE && newReputation >= WIN_REPUTATION;
+  const meetsBrandRequirement =
+    newExposure >= WIN_EXPOSURE && newReputation >= WIN_REPUTATION;
   const reachedTimeLimit = prev.totalWeeks > 0 && newWeek >= prev.totalWeeks;
-  const isWin = meetsReturnRequirement && meetsStreakRequirement && meetsBrandRequirement;
+  const isWin =
+    meetsReturnRequirement && meetsStreakRequirement && meetsBrandRequirement;
 
   // 计算本周结余（补货成本在 return 前扣除）
   const newCash = prevWithEffects.cash + finalProfit;
@@ -1038,12 +1306,13 @@ export function weeklyTick(prev: GameState): {
 
   // v2.7: 店长全局效果（士气+2/周，疲劳恢复+5%）
   const hasActiveManager = prevWithEffects.staff.some(
-    s => s.assignedTask === 'manager' && !s.isOnboarding && !(s.isTransitioning)
+    (s) =>
+      s.assignedTask === "manager" && !s.isOnboarding && !s.isTransitioning,
   );
   const managerMoraleBoost = hasActiveManager ? 2 : 0;
   const managerFatigueRecoveryBonus = hasActiveManager ? 0.05 : 0;
 
-  prevWithEffects.staff.forEach(s => {
+  prevWithEffects.staff.forEach((s) => {
     // --- 1. 入职适应期检查 ---
     const staff = { ...s };
     if (staff.isOnboarding && newWeek >= staff.onboardingEndsWeek) {
@@ -1063,7 +1332,10 @@ export function weeklyTick(prev: GameState): {
 
     // v2.7: 加薪士气加成衰减
     if (staff.salaryRaiseMoraleBoost && staff.salaryRaiseMoraleBoost > 0) {
-      staff.salaryRaiseMoraleBoost = Math.max(0, staff.salaryRaiseMoraleBoost - 4);
+      staff.salaryRaiseMoraleBoost = Math.max(
+        0,
+        staff.salaryRaiseMoraleBoost - 4,
+      );
     }
 
     // --- 2. 疲劳累积与恢复（基于工时和休息） ---
@@ -1071,7 +1343,8 @@ export function weeklyTick(prev: GameState): {
     const lowMoraleBonus = staff.morale < 40 ? 3 : 0;
     // 自然恢复：当前疲劳的15% + 每个休息日恢复3点（店长加成+5%）
     const restDays = 7 - staff.workDaysPerWeek;
-    const naturalRecovery = (staff.fatigue * 0.15 + restDays * 3) * (1 + managerFatigueRecoveryBonus);
+    const naturalRecovery =
+      (staff.fatigue * 0.15 + restDays * 3) * (1 + managerFatigueRecoveryBonus);
     const netFatigue = fatigueGain + lowMoraleBonus - naturalRecovery;
     staff.fatigue = Math.max(0, Math.min(100, staff.fatigue + netFatigue));
 
@@ -1079,9 +1352,12 @@ export function weeklyTick(prev: GameState): {
     const fatigueEffect = getStaffFatigueEffect(staff.fatigue);
     const fatigueMoralePenalty = staff.fatigue > 70 ? -3 : 0;
     // 盈利奖励增强（上限+4），亏损惩罚缓和（重亏-2，轻亏-1）
-    const profitMoraleEffect = finalProfit > 0
-      ? Math.min(4, Math.ceil(finalProfit / 2000))
-      : (finalProfit < -5000 ? -2 : -1);
+    const profitMoraleEffect =
+      finalProfit > 0
+        ? Math.min(4, Math.ceil(finalProfit / 2000))
+        : finalProfit < -5000
+          ? -2
+          : -1;
     const workHoursMoraleEffect = calculateWorkHoursMoraleEffect(staff);
     // 超时工作惩罚：超过 6天×10小时=60小时/周 后额外扣士气
     const weeklyHours = staff.workDaysPerWeek * staff.workHoursPerDay;
@@ -1089,9 +1365,20 @@ export function weeklyTick(prev: GameState): {
     // v2.7: 加薪士气加成 + 店长士气加成
     const salaryRaiseBoost = staff.salaryRaiseMoraleBoost || 0;
     // 基础衰减从 -1 降为 -0.5
-    staff.morale = Math.max(0, Math.min(100,
-      staff.morale - 0.5 + fatigueMoralePenalty + profitMoraleEffect + workHoursMoraleEffect + overtimeMoralePenalty + managerMoraleBoost + salaryRaiseBoost
-    ));
+    staff.morale = Math.max(
+      0,
+      Math.min(
+        100,
+        staff.morale -
+          0.5 +
+          fatigueMoralePenalty +
+          profitMoraleEffect +
+          workHoursMoraleEffect +
+          overtimeMoralePenalty +
+          managerMoraleBoost +
+          salaryRaiseBoost,
+      ),
+    );
 
     // --- 4. 重算实际效率和服务质量 ---
     const moraleEffect = getMoraleEffect(staff.morale);
@@ -1099,12 +1386,23 @@ export function weeklyTick(prev: GameState): {
     const overtimeEfficiencyPenalty = weeklyHours > 60 ? 0.9 : 1.0;
     // v2.7: 转岗过渡期效率惩罚
     const transitionPenalty = staff.isTransitioning ? 0.5 : 1.0;
-    staff.efficiency = staff.baseEfficiency * fatigueEffect.efficiencyPenalty * moraleEffect.efficiencyMod * overtimeEfficiencyPenalty * transitionPenalty;
-    staff.serviceQuality = staff.baseServiceQuality * fatigueEffect.servicePenalty * moraleEffect.serviceMod * overtimeEfficiencyPenalty * transitionPenalty;
+    staff.efficiency =
+      staff.baseEfficiency *
+      fatigueEffect.efficiencyPenalty *
+      moraleEffect.efficiencyMod *
+      overtimeEfficiencyPenalty *
+      transitionPenalty;
+    staff.serviceQuality =
+      staff.baseServiceQuality *
+      fatigueEffect.servicePenalty *
+      moraleEffect.serviceMod *
+      overtimeEfficiencyPenalty *
+      transitionPenalty;
 
     // --- 5. 离职检查（含1周预警缓冲） ---
     // 超时工作离职概率翻倍
-    const effectiveQuitRisk = weeklyHours > 60 ? fatigueEffect.quitRisk * 2 : fatigueEffect.quitRisk;
+    const effectiveQuitRisk =
+      weeklyHours > 60 ? fatigueEffect.quitRisk * 2 : fatigueEffect.quitRisk;
     if (effectiveQuitRisk > 0 && Math.random() < effectiveQuitRisk) {
       if (staff.wantsToQuit) {
         // 已标记过想辞职，本周真正离职
@@ -1124,7 +1422,8 @@ export function weeklyTick(prev: GameState): {
     staff.taskExp += weeklyExp;
     const expRequired = getSkillUpgradeRequirement(staff.skillLevel);
     if (staff.taskExp >= expRequired) {
-      const maxSkill = staffTypes.find(st => st.id === staff.typeId)?.maxSkillLevel || 5;
+      const maxSkill =
+        staffTypes.find((st) => st.id === staff.typeId)?.maxSkillLevel || 5;
       if (staff.skillLevel < maxSkill) {
         staff.taskExp -= expRequired;
         staff.skillLevel += 1;
@@ -1160,36 +1459,45 @@ export function weeklyTick(prev: GameState): {
 
   // ============ 整洁度更新 ============
   // v2.7: 重新设计清洁度机制，服务员可兼职清洁，小店不需要专职清洁工
-  const CLEANER_RATE = 8.0;           // 专职清洁恢复率
-  const WAITER_CLEAN_RATE = 2.5;      // 服务员清洁贡献
-  const WAITER_BUSY_THRESHOLD = 0.7;  // 忙碌阈值
-  const WAITER_BUSY_PENALTY = 0.5;    // 忙碌惩罚系数
-  const BASE_DIRT = 2.0;              // 基础脏度
-  const AREA_DIRT_FACTOR = 50;        // 面积因子（每50㎡+1点）
-  const SALES_DIRT_FACTOR = 300;      // 销售因子（每300份+1点）
+  const CLEANER_RATE = 8.0; // 专职清洁恢复率
+  const WAITER_CLEAN_RATE = 2.5; // 服务员清洁贡献
+  const WAITER_BUSY_THRESHOLD = 0.7; // 忙碌阈值
+  const WAITER_BUSY_PENALTY = 0.5; // 忙碌惩罚系数
+  const BASE_DIRT = 2.0; // 基础脏度
+  const AREA_DIRT_FACTOR = 50; // 面积因子（每50㎡+1点）
+  const SALES_DIRT_FACTOR = 300; // 销售因子（每300份+1点）
 
   const totalSalesForDirt = supplyDemandResult.productSales.reduce(
-    (sum, ps) => sum + ps.actualSales, 0
+    (sum, ps) => sum + ps.actualSales,
+    0,
   );
   const storeArea = prevWithEffects.storeArea || 30;
-  const dirtRate = BASE_DIRT + storeArea / AREA_DIRT_FACTOR + totalSalesForDirt / SALES_DIRT_FACTOR;
+  const dirtRate =
+    BASE_DIRT +
+    storeArea / AREA_DIRT_FACTOR +
+    totalSalesForDirt / SALES_DIRT_FACTOR;
 
   // 估算服务员忙碌率（基于需求/供给比）
-  const demandSupplyRatioForClean = supplyDemandResult.supply.totalSupply > 0
-    ? supplyDemandResult.demand.totalDemand / supplyDemandResult.supply.totalSupply
-    : 0;
-  const waiterBusyRate = Math.min(1, 0.3 + Math.min(1, demandSupplyRatioForClean) * 0.6);
+  const demandSupplyRatioForClean =
+    supplyDemandResult.supply.totalSupply > 0
+      ? supplyDemandResult.demand.totalDemand /
+        supplyDemandResult.supply.totalSupply
+      : 0;
+  const waiterBusyRate = Math.min(
+    1,
+    0.3 + Math.min(1, demandSupplyRatioForClean) * 0.6,
+  );
 
   let cleanerRecovery = 0;
-  updatedStaff.forEach(s => {
+  updatedStaff.forEach((s) => {
     if (s.isOnboarding) return;
     const hours = s.workDaysPerWeek * s.workHoursPerDay;
     const workRatio = hours / 48;
 
-    if (s.assignedTask === 'cleaner') {
+    if (s.assignedTask === "cleaner") {
       // 专职清洁工：满效率清洁
       cleanerRecovery += s.efficiency * workRatio * CLEANER_RATE;
-    } else if (s.assignedTask === 'waiter') {
+    } else if (s.assignedTask === "waiter") {
       // 服务员兼职清洁：忙碌时效率减半
       let contribution = s.efficiency * workRatio * WAITER_CLEAN_RATE;
       if (waiterBusyRate > WAITER_BUSY_THRESHOLD) {
@@ -1199,17 +1507,23 @@ export function weeklyTick(prev: GameState): {
     }
     // 后厨、营销不参与清洁
   });
-  const newCleanliness = Math.max(0, Math.min(100, (prevWithEffects.cleanliness ?? 60) - dirtRate + cleanerRecovery));
+  const newCleanliness = Math.max(
+    0,
+    Math.min(
+      100,
+      (prevWithEffects.cleanliness ?? 60) - dirtRate + cleanerRecovery,
+    ),
+  );
 
   // ============ 营销活动状态更新 ============
   const updatedMarketingActivities = prevWithEffects.activeMarketingActivities
-    .map(activity => ({
+    .map((activity) => ({
       ...activity,
       activeWeeks: activity.activeWeeks + 1,
     }))
-    .filter(activity => {
+    .filter((activity) => {
       const config = getActivityConfig(activity.id);
-      if (config?.type === 'one_time' && config.maxDuration) {
+      if (config?.type === "one_time" && config.maxDuration) {
         return activity.activeWeeks < config.maxDuration;
       }
       return true;
@@ -1220,51 +1534,57 @@ export function weeklyTick(prev: GameState): {
   let weeklyHoldingCost = 0;
   let weeklyRestockCost = 0;
 
-  const updatedInventoryItems = prevWithEffects.inventoryState.items.map(item => {
-    const updated = { ...item };
+  const updatedInventoryItems = prevWithEffects.inventoryState.items.map(
+    (item) => {
+      const updated = { ...item };
 
-    // Step 1: 损耗扣减（按存储类型）
-    const wasteRate = getWasteRate(item.storageType);
-    const wasteQty = Math.floor(item.quantity * wasteRate);
-    updated.quantity = Math.max(0, updated.quantity - wasteQty);
-    updated.lastWeekWaste = wasteQty;
-    weeklyWasteCost += wasteQty * item.unitCost;
+      // Step 1: 损耗扣减（按存储类型）
+      const wasteRate = getWasteRate(item.storageType);
+      const wasteQty = Math.floor(item.quantity * wasteRate);
+      updated.quantity = Math.max(0, updated.quantity - wasteQty);
+      updated.lastWeekWaste = wasteQty;
+      weeklyWasteCost += wasteQty * item.unitCost;
 
-    // Step 2: 持有成本
-    const holdingValue = updated.quantity * item.unitCost;
-    weeklyHoldingCost += calculateHoldingCost(holdingValue, item.storageType);
+      // Step 2: 持有成本
+      const holdingValue = updated.quantity * item.unitCost;
+      weeklyHoldingCost += calculateHoldingCost(holdingValue, item.storageType);
 
-    // Step 3: 销售扣减（根据供需模型实际销量）
-    const sale = supplyDemandResult.productSales.find(
-      s => s.productId === item.productId
-    );
-    const actualSales = sale?.actualSales || 0;
-    updated.quantity = Math.max(0, updated.quantity - actualSales);
-    updated.lastWeekSales = actualSales;
+      // Step 3: 销售扣减（根据供需模型实际销量）
+      const sale = supplyDemandResult.productSales.find(
+        (s) => s.productId === item.productId,
+      );
+      const actualSales = sale?.actualSales || 0;
+      updated.quantity = Math.max(0, updated.quantity - actualSales);
+      updated.lastWeekSales = actualSales;
 
-    // Step 4: 自动补货（已移除手动模式，遗留 manual 自动迁移为 auto_standard）
-    if (updated.restockStrategy === 'manual') {
-      updated.restockStrategy = 'auto_standard';
-    }
-    const restockQty = calculateRestockQuantity(
-      updated.quantity, actualSales, updated.restockStrategy, prevWithEffects.cognition.level
-    );
-    if (restockQty > 0) {
-      const restockCost = restockQty * item.unitCost;
-      updated.quantity += restockQty;
-      updated.lastRestockQuantity = restockQty;
-      updated.lastRestockCost = restockCost;
-      weeklyRestockCost += restockCost;
-    } else {
-      updated.lastRestockQuantity = 0;
-      updated.lastRestockCost = 0;
-    }
+      // Step 4: 自动补货（已移除手动模式，遗留 manual 自动迁移为 auto_standard）
+      if (updated.restockStrategy === "manual") {
+        updated.restockStrategy = "auto_standard";
+      }
+      const restockQty = calculateRestockQuantity(
+        updated.quantity,
+        actualSales,
+        updated.restockStrategy,
+        prevWithEffects.cognition.level,
+      );
+      if (restockQty > 0) {
+        const restockCost = restockQty * item.unitCost;
+        updated.quantity += restockQty;
+        updated.lastRestockQuantity = restockQty;
+        updated.lastRestockCost = restockCost;
+        weeklyRestockCost += restockCost;
+      } else {
+        updated.lastRestockQuantity = 0;
+        updated.lastRestockCost = 0;
+      }
 
-    return updated;
-  });
+      return updated;
+    },
+  );
 
   const updatedInventoryValue = updatedInventoryItems.reduce(
-    (sum, item) => sum + item.quantity * item.unitCost, 0
+    (sum, item) => sum + item.quantity * item.unitCost,
+    0,
   );
 
   let finalCash = newCash - weeklyRestockCost;
@@ -1275,30 +1595,34 @@ export function weeklyTick(prev: GameState): {
   finalCash -= bossActionCost;
   finalProfit -= bossActionCost;
 
-  // 破产检查：资金低于最低运营线即触发破产
-  const finalIsBankrupt = finalCash < MIN_OPERATING_CASH;
+  // 破产检查：使用动态最低运营线（= max(基础下限, 周薪资, 半月租金)）
+  // 反映现实：老板不可能长期欠员工工资或半个月房租仍继续经营
+  const dynamicMinCash = calculateMinOperatingCash(updatedState);
+  const finalIsBankrupt = finalCash < dynamicMinCash;
 
   // ============ 计算员工忙碌度统计 ============
   // 使用包含外卖的总需求，员工出餐同时服务堂食和外卖
   const totalDemandIncludingDelivery = supplyDemandResult.productSales.reduce(
-    (sum, ps) => sum + ps.demand, 0
+    (sum, ps) => sum + ps.demand,
+    0,
   );
-  const demandSupplyRatio = supplyDemandResult.supply.totalSupply > 0
-    ? totalDemandIncludingDelivery / supplyDemandResult.supply.totalSupply
-    : 0;
-  const staffWorkStats = updatedStaff.map(staff => {
+  const demandSupplyRatio =
+    supplyDemandResult.supply.totalSupply > 0
+      ? totalDemandIncludingDelivery / supplyDemandResult.supply.totalSupply
+      : 0;
+  const staffWorkStats = updatedStaff.map((staff) => {
     const totalHours = staff.workDaysPerWeek * staff.workHoursPerDay;
     const taskDef = getTaskDefinition(staff.assignedTask);
-    const taskName = taskDef?.name || '未分配';
+    const taskName = taskDef?.name || "未分配";
     let busyRate: number;
     if (staff.isOnboarding) {
       busyRate = 0.15;
     } else if ((taskDef?.productionMultiplier || 0) > 0.5) {
       busyRate = Math.min(1, demandSupplyRatio * 0.95);
-    } else if (staff.assignedTask === 'marketer') {
+    } else if (staff.assignedTask === "marketer") {
       // 曝光越低越忙（有更多工作要做）
       busyRate = Math.max(0.3, 1.0 - newExposure / 150);
-    } else if (staff.assignedTask === 'cleaner') {
+    } else if (staff.assignedTask === "cleaner") {
       // 客流越大越忙
       busyRate = 0.4 + Math.min(0.5, demandSupplyRatio * 0.3);
     } else {
@@ -1314,16 +1638,25 @@ export function weeklyTick(prev: GameState): {
       weeklyRevenue = 0;
     } else if ((taskDef?.productionMultiplier || 0) > 0.5) {
       // 产能岗：贡献 = 忙碌时间 × 效率 × 产能系数
-      weeklyContribution = busyRate * staff.efficiency * (taskDef?.productionMultiplier || 0) * workRatio;
+      weeklyContribution =
+        busyRate *
+        staff.efficiency *
+        (taskDef?.productionMultiplier || 0) *
+        workRatio;
       // 创收估算：按平均客单价
-      const avgPrice = supplyDemandResult.productSales.length > 0
-        ? supplyDemandResult.totalRevenue / Math.max(1, supplyDemandResult.totalSales) : 0;
+      const avgPrice =
+        supplyDemandResult.productSales.length > 0
+          ? supplyDemandResult.totalRevenue /
+            Math.max(1, supplyDemandResult.totalSales)
+          : 0;
       weeklyRevenue = weeklyContribution * avgPrice * 10; // 归一化
-    } else if (staff.assignedTask === 'marketer') {
-      weeklyContribution = staff.efficiency * workRatio * (taskDef?.exposureBoostRate || 2.5);
+    } else if (staff.assignedTask === "marketer") {
+      weeklyContribution =
+        staff.efficiency * workRatio * (taskDef?.exposureBoostRate || 2.5);
       weeklyRevenue = 0; // 营销员不直接创收
-    } else if (staff.assignedTask === 'cleaner') {
-      weeklyContribution = staff.efficiency * workRatio * (taskDef?.cleanlinessRate || 8.0);
+    } else if (staff.assignedTask === "cleaner") {
+      weeklyContribution =
+        staff.efficiency * workRatio * (taskDef?.cleanlinessRate || 8.0);
       weeklyRevenue = 0;
     } else {
       // 服务岗/店长
@@ -1331,7 +1664,8 @@ export function weeklyTick(prev: GameState): {
       weeklyRevenue = 0;
     }
     const weeklySalaryCost = staff.salary / 4;
-    const costEfficiency = weeklySalaryCost > 0 ? weeklyContribution / weeklySalaryCost * 100 : 0;
+    const costEfficiency =
+      weeklySalaryCost > 0 ? (weeklyContribution / weeklySalaryCost) * 100 : 0;
 
     return {
       staffId: staff.id,
@@ -1353,20 +1687,43 @@ export function weeklyTick(prev: GameState): {
   // NOTE: 此处内联构造 CurrentStats 而非复用 gameQuery.calculateCurrentStats，
   // 因为 weeklyTick 执行时 state 尚未落盘，gameQuery 依赖的是上一轮 state。
   // 这里使用本轮刚计算出的 finalRevenue/finalProfit 等值，确保诊断基于最新数据。
-  const totalFixedAndExtra = fixedCost + weeklyPromotionCostTotal + buffCostExtra + eventCostExtra;
+  const totalFixedAndExtra =
+    fixedCost + weeklyPromotionCostTotal + buffCostExtra + eventCostExtra;
+  const cogsForDiagnose = calculateCOGS(
+    finalRevenue,
+    updatedState,
+    supplyDemandResult,
+  );
   const tempStats = {
     revenue: finalRevenue,
     variableCost,
+    cogs: cogsForDiagnose,
     fixedCost: totalFixedAndExtra,
-    fixedCostBreakdown: { ...calculateFixedCostBreakdown(updatedState), promotion: weeklyPromotionCostTotal, total: totalFixedAndExtra },
+    fixedCostBreakdown: {
+      ...calculateFixedCostBreakdown(updatedState),
+      promotion: weeklyPromotionCostTotal,
+      total: totalFixedAndExtra,
+    },
     profit: finalProfit,
-    margin: finalRevenue > 0 ? ((finalRevenue - variableCost) / finalRevenue) * 100 : 0,
-    breakEvenPoint: finalRevenue > variableCost
-      ? totalFixedAndExtra / ((finalRevenue - variableCost) / finalRevenue)
-      : Infinity,
+    margin:
+      finalRevenue > 0
+        ? ((finalRevenue - variableCost) / finalRevenue) * 100
+        : 0,
+    grossMargin:
+      finalRevenue > 0
+        ? ((finalRevenue - cogsForDiagnose) / finalRevenue) * 100
+        : 0,
+    breakEvenPoint:
+      finalRevenue > variableCost
+        ? totalFixedAndExtra / ((finalRevenue - variableCost) / finalRevenue)
+        : Infinity,
   };
   const healthAlerts = diagnoseHealth(
-    { ...updatedState, currentWeek: newWeek, profitHistory: [...prev.profitHistory, finalProfit] },
+    {
+      ...updatedState,
+      currentWeek: newWeek,
+      profitHistory: [...prev.profitHistory, finalProfit],
+    },
     tempStats,
     supplyDemandResult,
   );
@@ -1384,19 +1741,22 @@ export function weeklyTick(prev: GameState): {
     totalDemand: totalDemandIncludingDelivery,
     totalSupply: supplyDemandResult.supply.totalSupply,
     fulfillmentRate: avgFulfillment,
-    productSales: supplyDemandResult.productSales.map(s => ({
+    productSales: supplyDemandResult.productSales.map((s) => ({
       productId: s.productId,
       name: s.productName,
       sales: s.actualSales,
       revenue: s.revenue,
     })),
     staffCount: updatedStaff.length,
-    avgMorale: updatedStaff.length > 0
-      ? updatedStaff.reduce((s, st) => s + st.morale, 0) / updatedStaff.length
-      : 0,
-    avgFatigue: updatedStaff.length > 0
-      ? updatedStaff.reduce((s, st) => s + st.fatigue, 0) / updatedStaff.length
-      : 0,
+    avgMorale:
+      updatedStaff.length > 0
+        ? updatedStaff.reduce((s, st) => s + st.morale, 0) / updatedStaff.length
+        : 0,
+    avgFatigue:
+      updatedStaff.length > 0
+        ? updatedStaff.reduce((s, st) => s + st.fatigue, 0) /
+          updatedStaff.length
+        : 0,
     quitStaffNames,
     cognitionLevel: newCognition.level,
     expGained,
@@ -1404,9 +1764,10 @@ export function weeklyTick(prev: GameState): {
     event,
     interactiveEventResponse: prev.lastInteractiveEventResponse,
     consecutiveProfits: newConsecutiveProfits,
-    returnOnInvestmentProgress: prev.totalInvestment > 0
-      ? (newCumulativeProfit / prev.totalInvestment) * 100
-      : 0,
+    returnOnInvestmentProgress:
+      prev.totalInvestment > 0
+        ? (newCumulativeProfit / prev.totalInvestment) * 100
+        : 0,
     healthAlerts,
     cleanlinessChange: newCleanliness - (prevWithEffects.cleanliness ?? 60),
     delayedEffectNarratives,
@@ -1417,11 +1778,13 @@ export function weeklyTick(prev: GameState): {
     bossActionCost,
   };
 
-  const gameOverReason: GameState['gameOverReason'] =
-    finalIsBankrupt ? 'bankrupt'
-      : isWin ? 'win'
-        : reachedTimeLimit ? 'time_limit'
-          : null;
+  const gameOverReason: GameState["gameOverReason"] = finalIsBankrupt
+    ? "bankrupt"
+    : isWin
+      ? "win"
+      : reachedTimeLimit
+        ? "time_limit"
+        : null;
 
   // ============ 老板周行动：执行本周行动 + 状态更新 ============
   const prevBossAction = prev.bossAction;
@@ -1430,32 +1793,44 @@ export function weeklyTick(prev: GameState): {
   // （费用已在前面提前扣除，纳入利润和破产判定）
 
   // 周边考察：生成考察结果
-  if (prevBossAction.currentAction === 'investigate_nearby') {
-    const openShops = prev.nearbyShops.filter(s => !s.isClosing && !s.closedWeek);
+  if (prevBossAction.currentAction === "investigate_nearby") {
+    const openShops = prev.nearbyShops.filter(
+      (s) => !s.isClosing && !s.closedWeek,
+    );
     if (openShops.length > 0) {
       // 优先使用玩家选定的店铺，否则随机
       const targetShop = prevBossAction.targetShopId
-        ? openShops.find(s => s.id === prevBossAction.targetShopId) || openShops[Math.floor(Math.random() * openShops.length)]
+        ? openShops.find((s) => s.id === prevBossAction.targetShopId) ||
+          openShops[Math.floor(Math.random() * openShops.length)]
         : openShops[Math.floor(Math.random() * openShops.length)];
 
       const revealed = newBossAction.revealedShopInfo[targetShop.id] || [];
-      const unrevealed = INVESTIGATION_DIMENSIONS
-        .map(d => d.id)
-        .filter(d => !revealed.includes(d));
+      const unrevealed = INVESTIGATION_DIMENSIONS.map((d) => d.id).filter(
+        (d) => !revealed.includes(d),
+      );
 
-      const dimCount = prevWithEffects.cognition.level >= 3 ? Math.min(2, unrevealed.length || 1) : 1;
+      const dimCount =
+        prevWithEffects.cognition.level >= 3
+          ? Math.min(2, unrevealed.length || 1)
+          : 1;
       const dims: InvestigationDimension[] = [];
-      const dimPool = unrevealed.length > 0 ? [...unrevealed] : INVESTIGATION_DIMENSIONS.map(d => d.id);
+      const dimPool =
+        unrevealed.length > 0
+          ? [...unrevealed]
+          : INVESTIGATION_DIMENSIONS.map((d) => d.id);
       for (let i = 0; i < dimCount && dimPool.length > 0; i++) {
         const idx = Math.floor(Math.random() * dimPool.length);
         dims.push(dimPool[idx]);
         dimPool.splice(idx, 1);
       }
 
-      const results = dims.map(dim => {
-        const { displayValue, isAccurate, cogWarning } = generateInvestigationResult(
-          targetShop, dim, prevWithEffects.cognition.level
-        );
+      const results = dims.map((dim) => {
+        const { displayValue, isAccurate, cogWarning } =
+          generateInvestigationResult(
+            targetShop,
+            dim,
+            prevWithEffects.cognition.level,
+          );
         return {
           shopId: targetShop.id,
           shopName: targetShop.name,
@@ -1469,34 +1844,47 @@ export function weeklyTick(prev: GameState): {
 
       newBossAction.revealedShopInfo = {
         ...newBossAction.revealedShopInfo,
-        [targetShop.id]: [...revealed, ...dims.filter(d => !revealed.includes(d))],
+        [targetShop.id]: [
+          ...revealed,
+          ...dims.filter((d) => !revealed.includes(d)),
+        ],
       };
-      newBossAction.investigationHistory = [...newBossAction.investigationHistory, ...results];
+      newBossAction.investigationHistory = [
+        ...newBossAction.investigationHistory,
+        ...results,
+      ];
     }
   }
 
   // 蹲点数人头：生成客流观察结果
-  if (prevBossAction.currentAction === 'count_traffic') {
+  if (prevBossAction.currentAction === "count_traffic") {
     // 使用更新后的消费者环数据（含季节波动）
-    const ringsForTraffic = updatedConsumerRings.length > 0 ? updatedConsumerRings : prev.consumerRings;
+    const ringsForTraffic =
+      updatedConsumerRings.length > 0
+        ? updatedConsumerRings
+        : prev.consumerRings;
     let handled = false;
 
     if (prevBossAction.targetShopId) {
       // 蹲点观察指定店铺的客流
-      const targetShop = prev.nearbyShops.find(s => s.id === prevBossAction.targetShopId);
+      const targetShop = prev.nearbyShops.find(
+        (s) => s.id === prevBossAction.targetShopId,
+      );
       if (targetShop) {
         // 基于店铺曝光度和所在环的客流估算
         const shopTraffic = Math.round(targetShop.exposure * 1.2 + 15);
         const dailyTraffic = Math.round(shopTraffic / 7);
-        const { displayValue, isAccurate, cogWarning } = generateTrafficCountResult(
-          Math.max(1, dailyTraffic), prevWithEffects.cognition.level
-        );
+        const { displayValue, isAccurate, cogWarning } =
+          generateTrafficCountResult(
+            Math.max(1, dailyTraffic),
+            prevWithEffects.cognition.level,
+          );
         newBossAction.investigationHistory = [
           ...newBossAction.investigationHistory,
           {
             shopId: targetShop.id,
             shopName: targetShop.name,
-            dimension: 'traffic' as InvestigationDimension,
+            dimension: "traffic" as InvestigationDimension,
             displayValue,
             isAccurate,
             cogWarning,
@@ -1510,20 +1898,25 @@ export function weeklyTick(prev: GameState): {
     if (!handled) {
       // 蹲点观察本店周边总客流
       const totalWeeklyTraffic = ringsForTraffic.reduce((sum, ring) => {
-        const ringTotal = Object.values(ring.consumers).reduce((s, v) => s + v, 0);
+        const ringTotal = Object.values(ring.consumers).reduce(
+          (s, v) => s + v,
+          0,
+        );
         return sum + ringTotal * ring.baseConversion;
       }, 0);
       // 转换为日均客流
       const dailyTraffic = Math.round(totalWeeklyTraffic / 7);
-      const { displayValue, isAccurate, cogWarning } = generateTrafficCountResult(
-        Math.max(1, dailyTraffic), prevWithEffects.cognition.level
-      );
+      const { displayValue, isAccurate, cogWarning } =
+        generateTrafficCountResult(
+          Math.max(1, dailyTraffic),
+          prevWithEffects.cognition.level,
+        );
       newBossAction.investigationHistory = [
         ...newBossAction.investigationHistory,
         {
-          shopId: '_self',
-          shopName: '本店周边',
-          dimension: 'traffic' as InvestigationDimension,
+          shopId: "_self",
+          shopName: "本店周边",
+          dimension: "traffic" as InvestigationDimension,
           displayValue,
           isAccurate,
           cogWarning,
@@ -1534,22 +1927,38 @@ export function weeklyTick(prev: GameState): {
   }
 
   // 同行饭局：生成洞察
-  if (prevBossAction.currentAction === 'industry_dinner') {
+  if (prevBossAction.currentAction === "industry_dinner") {
     // 获取玩家主营品类用于模板替换
-    const playerCategory = prev.selectedProducts.length > 0
-      ? prev.selectedProducts[0].category
-      : undefined;
+    const playerCategory =
+      prev.selectedProducts.length > 0
+        ? prev.selectedProducts[0].category
+        : undefined;
     const { content, isAccurate, cogWarning, buff } = generateDinnerInsight(
-      prevWithEffects.cognition.level, prev.currentWeek, playerCategory
+      prevWithEffects.cognition.level,
+      prev.currentWeek,
+      playerCategory,
     );
-    const insight: typeof newBossAction.insightHistory[0] = {
-      content, isAccurate, cogWarning, week: prev.currentWeek,
+    const insight: (typeof newBossAction.insightHistory)[0] = {
+      content,
+      isAccurate,
+      cogWarning,
+      week: prev.currentWeek,
     };
     if (buff) {
-      insight.buff = { type: buff.type, value: buff.value, remainingWeeks: buff.weeks, source: buff.source };
+      insight.buff = {
+        type: buff.type,
+        value: buff.value,
+        remainingWeeks: buff.weeks,
+        source: buff.source,
+      };
       newBossAction.activeBuffs = [
         ...newBossAction.activeBuffs,
-        { type: buff.type, value: buff.value, remainingWeeks: buff.weeks, source: buff.source },
+        {
+          type: buff.type,
+          value: buff.value,
+          remainingWeeks: buff.weeks,
+          source: buff.source,
+        },
       ];
     }
     newBossAction.insightHistory = [...newBossAction.insightHistory, insight];
@@ -1557,31 +1966,34 @@ export function weeklyTick(prev: GameState): {
 
   // 2. buff 衰减：每周 -1，移除过期 buff
   newBossAction.activeBuffs = newBossAction.activeBuffs
-    .map(b => ({ ...b, remainingWeeks: b.remainingWeeks - 1 }))
-    .filter(b => b.remainingWeeks > 0);
+    .map((b) => ({ ...b, remainingWeeks: b.remainingWeeks - 1 }))
+    .filter((b) => b.remainingWeeks > 0);
   // 蹲点连续周数追踪
-  newBossAction.consecutiveStudyWeeks = prevBossAction.currentAction === 'count_traffic'
-    ? (prevBossAction.consecutiveStudyWeeks || 0) + 1
-    : 0;
+  newBossAction.consecutiveStudyWeeks =
+    prevBossAction.currentAction === "count_traffic"
+      ? (prevBossAction.consecutiveStudyWeeks || 0) + 1
+      : 0;
 
   // Fix 6: 历史记录上限，防止无限增长（保留最近30条）
   const HISTORY_CAP = 30;
   if (newBossAction.investigationHistory.length > HISTORY_CAP) {
-    newBossAction.investigationHistory = newBossAction.investigationHistory.slice(-HISTORY_CAP);
+    newBossAction.investigationHistory =
+      newBossAction.investigationHistory.slice(-HISTORY_CAP);
   }
   if (newBossAction.insightHistory.length > HISTORY_CAP) {
-    newBossAction.insightHistory = newBossAction.insightHistory.slice(-HISTORY_CAP);
+    newBossAction.insightHistory =
+      newBossAction.insightHistory.slice(-HISTORY_CAP);
   }
 
   // 3. 重置为默认行动（巡店督导）
-  newBossAction.currentAction = 'supervise';
+  newBossAction.currentAction = "supervise";
   newBossAction.workRole = undefined;
   newBossAction.targetShopId = undefined;
 
   // 巡店督导效果：全员士气+3
   let finalStaff = updatedStaff;
-  if (prevBossAction.currentAction === 'supervise') {
-    finalStaff = updatedStaff.map(s => ({
+  if (prevBossAction.currentAction === "supervise") {
+    finalStaff = updatedStaff.map((s) => ({
       ...s,
       morale: Math.min(100, s.morale + 3),
     }));
@@ -1598,7 +2010,8 @@ export function weeklyTick(prev: GameState): {
     profitHistory: [...prev.profitHistory, finalProfit],
     revenueHistory: [...prev.revenueHistory, finalRevenue],
     cashHistory: [...prev.cashHistory, finalCash],
-    gamePhase: (finalIsBankrupt || isWin || reachedTimeLimit) ? 'ended' : 'operating',
+    gamePhase:
+      finalIsBankrupt || isWin || reachedTimeLimit ? "ended" : "operating",
     // 认知系统状态
     cognition: newCognition,
     // 老板周行动
