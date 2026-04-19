@@ -1,14 +1,21 @@
 // 赛博勇哥 - System Prompt 与游戏状态序列化
 // 勇哥人设基于抖音博主"勇哥餐饮创业说"的真实风格
 
-import type { GameState, SupplyDemandResult, HealthAlert } from '@/types/game';
-import type { ToolDefinition } from '@/lib/llm/client';
+import type { GameState, SupplyDemandResult, HealthAlert } from "@/types/game";
+import type { ToolDefinition } from "@/lib/llm/client";
 
 // ============ 可执行提案类型 ============
 
 export interface Proposal {
-  type: 'fire_staff' | 'set_price' | 'start_marketing' | 'stop_marketing'
-    | 'join_platform' | 'leave_platform' | 'change_restock' | 'hire_staff';
+  type:
+    | "fire_staff"
+    | "set_price"
+    | "start_marketing"
+    | "stop_marketing"
+    | "join_platform"
+    | "leave_platform"
+    | "change_restock"
+    | "hire_staff";
   params: Record<string, string | number>;
   label: string; // 人类可读描述
 }
@@ -16,32 +23,41 @@ export interface Proposal {
 // ============ 模拟工具定义（function calling） ============
 
 export const SIMULATE_TOOL: ToolDefinition = {
-  type: 'function',
+  type: "function",
   function: {
-    name: 'simulate_proposals',
-    description: '用供需模型测算你的建议操作的实际效果。传入建议操作列表，返回利润变化预测。如果结果不理想，你可以换个方案再调用。最多可调用3次。',
+    name: "simulate_proposals",
+    description:
+      "用供需模型测算你的建议操作的实际效果。传入建议操作列表，返回利润变化预测。如果结果不理想，你可以换个方案再调用。最多可调用3次。",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         proposals: {
-          type: 'array',
-          description: '建议操作列表，每项包含 type/params/label',
+          type: "array",
+          description: "建议操作列表，每项包含 type/params/label",
           items: {
-            type: 'object',
+            type: "object",
             properties: {
               type: {
-                type: 'string',
-                enum: ['fire_staff', 'set_price', 'start_marketing', 'stop_marketing',
-                       'join_platform', 'leave_platform', 'change_restock', 'hire_staff'],
+                type: "string",
+                enum: [
+                  "fire_staff",
+                  "set_price",
+                  "start_marketing",
+                  "stop_marketing",
+                  "join_platform",
+                  "leave_platform",
+                  "change_restock",
+                  "hire_staff",
+                ],
               },
-              params: { type: 'object', description: '操作参数' },
-              label: { type: 'string', description: '人类可读描述' },
+              params: { type: "object", description: "操作参数" },
+              label: { type: "string", description: "人类可读描述" },
             },
-            required: ['type', 'params', 'label'],
+            required: ["type", "params", "label"],
           },
         },
       },
-      required: ['proposals'],
+      required: ["proposals"],
     },
   },
 };
@@ -256,6 +272,7 @@ export const YONGGE_SYSTEM_PROMPT = `你是"勇哥"，抖音359万粉丝餐饮�
 interface CurrentStats {
   revenue: number;
   variableCost: number;
+  cogs?: number; // 销售成本（COGS，仅含原料+损耗）
   fixedCost: number;
   fixedCostBreakdown: {
     rent: number;
@@ -263,14 +280,21 @@ interface CurrentStats {
     utilities: number;
     marketing: number;
     depreciation: number;
+    promotion?: number;
+    holding?: number;
+    activityMarketing?: number;
   };
   profit: number;
-  margin: number;
+  margin: number; // 贡献毛益率 (Rev - VC) / Rev
+  grossMargin?: number; // 毛利率 (Rev - COGS) / Rev
   breakEvenPoint: number;
 }
 
 const SEASON_NAMES: Record<string, string> = {
-  spring: '春季', summer: '夏季', autumn: '秋季', winter: '冬季',
+  spring: "春季",
+  summer: "夏季",
+  autumn: "秋季",
+  winter: "冬季",
 };
 
 export function serializeGameState(
@@ -282,28 +306,35 @@ export function serializeGameState(
   const lines: string[] = [];
 
   // 基础信息
-  lines.push('【玩家经营状况】');
-  if (gameState.gamePhase === 'setup') {
-    lines.push('阶段：筹备中（还没开店）');
+  lines.push("【玩家经营状况】");
+  if (gameState.gamePhase === "setup") {
+    lines.push("阶段：筹备中（还没开店）");
   } else {
     lines.push(`阶段：经营第${gameState.currentWeek}周`);
-    lines.push(`季节：${SEASON_NAMES[gameState.currentSeason] || gameState.currentSeason}`);
+    lines.push(
+      `季节：${SEASON_NAMES[gameState.currentSeason] || gameState.currentSeason}`,
+    );
   }
   // 认知等级转为自然语言，不暴露数值
   const cogLevel = gameState.cognition.level;
-  const cogDesc = cogLevel >= 4 ? '经营经验丰富，踩过不少坑也学到不少'
-    : cogLevel >= 2 ? '有一定经营经验，但还在摸索中'
-    : '刚入行的新手，很多东西还不懂';
+  const cogDesc =
+    cogLevel >= 4
+      ? "经营经验丰富，踩过不少坑也学到不少"
+      : cogLevel >= 2
+        ? "有一定经营经验，但还在摸索中"
+        : "刚入行的新手，很多东西还不懂";
   lines.push(`经营经验：${cogDesc}`);
 
   // 品牌
   if (gameState.selectedBrand) {
     const b = gameState.selectedBrand;
-    lines.push('');
-    lines.push('【品牌】');
-    lines.push(`${b.name}（${b.type === 'franchise' ? '加盟' : '自主创业'}）`);
-    if (b.isQuickFranchise) lines.push('⚠️ 这是快招品牌！');
-    lines.push(`加盟费：${b.franchiseFee}元，抽成：${(b.royaltyRate * 100).toFixed(0)}%`);
+    lines.push("");
+    lines.push("【品牌】");
+    lines.push(`${b.name}（${b.type === "franchise" ? "加盟" : "自主创业"}）`);
+    if (b.isQuickFranchise) lines.push("⚠️ 这是快招品牌！");
+    lines.push(
+      `加盟费：${b.franchiseFee}元，抽成：${(b.royaltyRate * 100).toFixed(0)}%`,
+    );
   }
 
   // 选址
@@ -313,17 +344,22 @@ export function serializeGameState(
     const area = addr?.area || gameState.storeArea;
     const rentMod = addr?.rentModifier || 1;
     const trafficMod = addr?.trafficModifier || 1;
-    lines.push('');
-    lines.push('【选址】');
+    lines.push("");
+    lines.push("【选址】");
     lines.push(`区位：${loc.name}（${loc.type}）`);
     if (addr) lines.push(`地址：${addr.name}，${area}平米`);
     lines.push(`月租金：约${Math.round(loc.rentPerSqm * area * rentMod)}元`);
     // 用自然语言描述人流量，避免暴露原始修正系数
-    const trafficDesc = trafficMod >= 1.3 ? '人流量很旺'
-      : trafficMod >= 1.1 ? '人流量还不错'
-      : trafficMod >= 0.9 ? '人流量一般'
-      : trafficMod >= 0.7 ? '人流量偏少'
-      : '人流量很差';
+    const trafficDesc =
+      trafficMod >= 1.3
+        ? "人流量很旺"
+        : trafficMod >= 1.1
+          ? "人流量还不错"
+          : trafficMod >= 0.9
+            ? "人流量一般"
+            : trafficMod >= 0.7
+              ? "人流量偏少"
+              : "人流量很差";
     lines.push(`位置人流：${trafficDesc}`);
   }
 
@@ -331,125 +367,219 @@ export function serializeGameState(
   if (gameState.selectedDecoration) {
     const d = gameState.selectedDecoration;
     const area = gameState.selectedAddress?.area || gameState.storeArea;
-    lines.push(`装修：${d.name}风格，${d.costPerSqm}元/平米，总计${d.costPerSqm * area}元`);
+    lines.push(
+      `装修：${d.name}风格，${d.costPerSqm}元/平米，总计${d.costPerSqm * area}元`,
+    );
   }
 
   // 选品
   if (gameState.selectedProducts.length > 0) {
-    lines.push('');
+    lines.push("");
     lines.push(`【选品】共${gameState.selectedProducts.length}种`);
-    gameState.selectedProducts.forEach(p => {
+    gameState.selectedProducts.forEach((p) => {
       const customPrice = gameState.productPrices[p.id];
       const price = customPrice || p.basePrice;
-      const margin = ((price - p.baseCost) / price * 100).toFixed(0);
-      lines.push(`- ${p.name}：售价${price}元，成本${p.baseCost}元，毛利率${margin}%`);
+      const margin = (((price - p.baseCost) / price) * 100).toFixed(0);
+      lines.push(
+        `- ${p.name}：售价${price}元，成本${p.baseCost}元，毛利率${margin}%`,
+      );
     });
     // 产品ID映射（仅供proposals引用，不要在诊断中提及）
-    lines.push('（产品ID映射，仅供proposals使用：' + gameState.selectedProducts.map(p => `${p.name}=${p.id}`).join('，') + '）');
+    lines.push(
+      "（产品ID映射，仅供proposals使用：" +
+        gameState.selectedProducts.map((p) => `${p.name}=${p.id}`).join("，") +
+        "）",
+    );
   }
 
   // 员工
   if (gameState.staff.length > 0) {
-    lines.push('');
+    lines.push("");
     lines.push(`【员工】共${gameState.staff.length}人`);
     gameState.staff.forEach((s, i) => {
-      const moraleDesc = s.morale >= 80 ? '干劲十足' : s.morale >= 60 ? '状态还行' : s.morale >= 40 ? '有点消极' : '快干不动了';
-      const fatigueDesc = s.fatigue >= 80 ? '累得不行' : s.fatigue >= 60 ? '比较疲惫' : s.fatigue >= 30 ? '还撑得住' : '精力充沛';
-      lines.push(`- [${i}] ${s.name}（${s.typeId}/${s.assignedTask}）月薪${s.salary}元，${moraleDesc}，${fatigueDesc} [id:${s.id}]`);
+      const moraleDesc =
+        s.morale >= 80
+          ? "干劲十足"
+          : s.morale >= 60
+            ? "状态还行"
+            : s.morale >= 40
+              ? "有点消极"
+              : "快干不动了";
+      const fatigueDesc =
+        s.fatigue >= 80
+          ? "累得不行"
+          : s.fatigue >= 60
+            ? "比较疲惫"
+            : s.fatigue >= 30
+              ? "还撑得住"
+              : "精力充沛";
+      lines.push(
+        `- [${i}] ${s.name}（${s.typeId}/${s.assignedTask}）月薪${s.salary}元，${moraleDesc}，${fatigueDesc} [id:${s.id}]`,
+      );
     });
     const totalSalary = gameState.staff.reduce((sum, s) => sum + s.salary, 0);
     lines.push(`月工资总额：${totalSalary}元`);
   }
 
   // 财务
-  lines.push('');
-  lines.push('【财务数据】');
+  lines.push("");
+  lines.push("【财务数据】");
   lines.push(`剩余现金：${Math.round(gameState.cash)}元`);
   lines.push(`总投资：${gameState.totalInvestment}元`);
 
-  if (gameState.gamePhase === 'operating') {
+  if (gameState.gamePhase === "operating") {
     lines.push(`本周收入：${Math.round(currentStats.revenue)}元`);
+    if (currentStats.cogs !== undefined) {
+      lines.push(
+        `销售成本（COGS，原料+损耗）：${Math.round(currentStats.cogs)}元`,
+      );
+    }
     lines.push(`本周变动成本：${Math.round(currentStats.variableCost)}元`);
     lines.push(`本周固定成本：${Math.round(currentStats.fixedCost)}元`);
     const bd = currentStats.fixedCostBreakdown;
-    lines.push(`  其中：租金${Math.round(bd.rent)} + 工资${Math.round(bd.salary)} + 水电${Math.round(bd.utilities)} + 营销${Math.round(bd.marketing)} + 折旧${Math.round(bd.depreciation)}`);
+    const fcParts = [
+      `租金${Math.round(bd.rent)}`,
+      `工资${Math.round(bd.salary)}`,
+      `水电${Math.round(bd.utilities)}`,
+      `品牌维护${Math.round(bd.marketing)}`,
+      `折旧${Math.round(bd.depreciation)}`,
+    ];
+    if (bd.promotion && bd.promotion > 0)
+      fcParts.push(`外卖推广${Math.round(bd.promotion)}`);
+    if (bd.holding && bd.holding > 0)
+      fcParts.push(`库存持有${Math.round(bd.holding)}`);
+    if (bd.activityMarketing && bd.activityMarketing > 0)
+      fcParts.push(`营销活动${Math.round(bd.activityMarketing)}`);
+    lines.push(`  其中：${fcParts.join(" + ")}`);
     lines.push(`本周利润：${Math.round(currentStats.profit)}元`);
-    lines.push(`毛利率：${currentStats.margin.toFixed(1)}%`);
-    lines.push(`盈亏平衡点：约${Math.round(currentStats.breakEvenPoint / 100) * 100}元/周`);
+    // 同时提供两种"毛利"口径，便于管理会计诊断
+    if (currentStats.grossMargin !== undefined) {
+      lines.push(
+        `毛利率（销售毛利，Rev-COGS 口径）：${currentStats.grossMargin.toFixed(1)}%`,
+      );
+      lines.push(
+        `贡献毛益率（剔除全部变动成本）：${currentStats.margin.toFixed(1)}% — 用于 BEP 计算`,
+      );
+    } else {
+      lines.push(`毛利率：${currentStats.margin.toFixed(1)}%`);
+    }
+    lines.push(
+      `盈亏平衡点：约${Math.round(currentStats.breakEvenPoint / 100) * 100}元/周（= 固定成本 / 贡献毛益率）`,
+    );
     // 连续盈利用自然语言，不暴露游戏胜利条件
     const streak = gameState.consecutiveProfits || 0;
     if (streak >= 4) {
-      lines.push('最近经营势头不错，连着好几周都在赚钱');
+      lines.push("最近经营势头不错，连着好几周都在赚钱");
     } else if (streak >= 2) {
-      lines.push('最近刚开始有点起色，连续赚了几周');
+      lines.push("最近刚开始有点起色，连续赚了几周");
     } else if (streak === 1) {
-      lines.push('上周刚赚了点钱，还不稳定');
+      lines.push("上周刚赚了点钱，还不稳定");
     } else {
-      lines.push('最近一直在亏钱');
+      lines.push("最近一直在亏钱");
     }
     lines.push(`累计利润：${Math.round(gameState.cumulativeProfit || 0)}元`);
 
     if (gameState.profitHistory.length > 0) {
       const recent = gameState.profitHistory.slice(-4);
-      lines.push(`近${recent.length}周利润：${recent.map(p => Math.round(p)).join(' → ')}`);
+      lines.push(
+        `近${recent.length}周利润：${recent.map((p) => Math.round(p)).join(" → ")}`,
+      );
     }
   }
 
   // 曝光度与口碑（用自然语言描述，避免暴露原始数值）
-  lines.push('');
-  lines.push('【经营指标】');
+  lines.push("");
+  lines.push("【经营指标】");
   const exposure = Math.round(gameState.exposure);
-  const exposureDesc = exposure >= 70 ? '知名度很高，周围很多人知道你的店'
-    : exposure >= 50 ? '知名度还行，有一定客源基础'
-    : exposure >= 30 ? '知名度一般，很多人还不知道你'
-    : '知名度很低，几乎没人知道你这有家店';
+  const exposureDesc =
+    exposure >= 70
+      ? "知名度很高，周围很多人知道你的店"
+      : exposure >= 50
+        ? "知名度还行，有一定客源基础"
+        : exposure >= 30
+          ? "知名度一般，很多人还不知道你"
+          : "知名度很低，几乎没人知道你这有家店";
   lines.push(`知名度：${exposureDesc}`);
   const reputation = Math.round(gameState.reputation);
-  const reputationDesc = reputation >= 70 ? '口碑很好，回头客多'
-    : reputation >= 50 ? '口碑还行，有一些回头客'
-    : reputation >= 30 ? '口碑一般，回头客不多'
-    : '口碑很差，差评比较多';
+  const reputationDesc =
+    reputation >= 70
+      ? "口碑很好，回头客多"
+      : reputation >= 50
+        ? "口碑还行，有一些回头客"
+        : reputation >= 30
+          ? "口碑一般，回头客不多"
+          : "口碑很差，差评比较多";
   lines.push(`口碑：${reputationDesc}`);
 
   // 库存满足率（用自然语言描述）
   if (gameState.lastWeekFulfillment !== undefined) {
     const fulfillPct = Math.round(gameState.lastWeekFulfillment * 100);
-    const fulfillDesc = fulfillPct >= 95 ? '供给充足，基本没有缺货'
-      : fulfillPct >= 80 ? '偶尔有顾客买不到想要的'
-      : fulfillPct >= 60 ? '经常缺货，不少顾客空手而归'
-      : '严重缺货，大量顾客买不到东西';
+    const fulfillDesc =
+      fulfillPct >= 95
+        ? "供给充足，基本没有缺货"
+        : fulfillPct >= 80
+          ? "偶尔有顾客买不到想要的"
+          : fulfillPct >= 60
+            ? "经常缺货，不少顾客空手而归"
+            : "严重缺货，大量顾客买不到东西";
     lines.push(`供货情况：${fulfillDesc}`);
   }
 
   // 外卖
   if (gameState.deliveryState && gameState.deliveryState.platforms.length > 0) {
     const ds = gameState.deliveryState;
-    lines.push('');
+    lines.push("");
     lines.push(`【外卖】已上线${ds.platforms.length}个平台`);
     const rating = ds.platformRating;
-    const ratingDesc = rating >= 4.5 ? '评分很高' : rating >= 4.0 ? '评分还不错' : rating >= 3.5 ? '评分一般' : '评分偏低';
+    const ratingDesc =
+      rating >= 4.5
+        ? "评分很高"
+        : rating >= 4.0
+          ? "评分还不错"
+          : rating >= 3.5
+            ? "评分一般"
+            : "评分偏低";
     lines.push(`平台${ratingDesc}，周外卖单量${ds.weeklyDeliveryOrders}单`);
-    lines.push(`外卖收入约${Math.round(ds.weeklyDeliveryRevenue / 100) * 100}元，佣金约${Math.round(ds.weeklyCommissionPaid / 100) * 100}元`);
+    lines.push(
+      `外卖收入约${Math.round(ds.weeklyDeliveryRevenue / 100) * 100}元，佣金约${Math.round(ds.weeklyCommissionPaid / 100) * 100}元`,
+    );
     const discountCost = ds.weeklyDiscountCost || 0;
     const packageCost = ds.weeklyPackageCost || 0;
     if (discountCost > 0 || packageCost > 0) {
-      lines.push(`满减补贴约${Math.round(discountCost / 10) * 10}元，包装费约${Math.round(packageCost / 10) * 10}元`);
+      lines.push(
+        `满减补贴约${Math.round(discountCost / 10) * 10}元，包装费约${Math.round(packageCost / 10) * 10}元`,
+      );
     }
-    ds.platforms.forEach(ap => {
-      const discountNames: Record<string, string> = { none: '无满减', small: '小额满减', standard: '标准满减', large: '大额满减', loss_leader: '亏本冲量' };
-      const pricingNames: Record<string, string> = { same: '同价', slight: '小幅上浮', medium: '中幅上浮', high: '大幅上浮' };
-      lines.push(`  ${ap.platformId}：权重分${Math.round(ap.platformExposure)}，${discountNames[ap.discountTierId] || '无满减'}，定价${pricingNames[ap.deliveryPricingId] || '同价'}，运营${ap.activeWeeks}周`);
+    ds.platforms.forEach((ap) => {
+      const discountNames: Record<string, string> = {
+        none: "无满减",
+        small: "小额满减",
+        standard: "标准满减",
+        large: "大额满减",
+        loss_leader: "亏本冲量",
+      };
+      const pricingNames: Record<string, string> = {
+        same: "同价",
+        slight: "小幅上浮",
+        medium: "中幅上浮",
+        high: "大幅上浮",
+      };
+      lines.push(
+        `  ${ap.platformId}：权重分${Math.round(ap.platformExposure)}，${discountNames[ap.discountTierId] || "无满减"}，定价${pricingNames[ap.deliveryPricingId] || "同价"}，运营${ap.activeWeeks}周`,
+      );
     });
   }
 
   // 周边竞争
-  const activeShops = (gameState.nearbyShops || []).filter(s => !s.isClosing);
+  const activeShops = (gameState.nearbyShops || []).filter((s) => !s.isClosing);
   if (activeShops.length > 0) {
-    const directCompetitors = activeShops.filter(s =>
-      gameState.selectedProducts.some(p => p.category === s.shopCategory)
+    const directCompetitors = activeShops.filter((s) =>
+      gameState.selectedProducts.some((p) => p.category === s.shopCategory),
     );
-    lines.push('');
-    lines.push(`【周边竞争】活跃店铺${activeShops.length}家，直接竞品${directCompetitors.length}家`);
+    lines.push("");
+    lines.push(
+      `【周边竞争】活跃店铺${activeShops.length}家，直接竞品${directCompetitors.length}家`,
+    );
   }
 
   // 供需（用自然语言描述市场竞争态势，不暴露精确份数）
@@ -457,21 +587,25 @@ export function serializeGameState(
     const demand = supplyDemandResult.demand.totalDemand;
     const supply = supplyDemandResult.supply.totalSupply;
     const ratio = supply / Math.max(demand, 1);
-    lines.push('');
-    lines.push('【市场竞争态势】');
+    lines.push("");
+    lines.push("【市场竞争态势】");
     if (ratio > 1.5) {
-      lines.push('市场严重供过于求，卖的人比买的人多太多了，竞争非常激烈');
+      lines.push("市场严重供过于求，卖的人比买的人多太多了，竞争非常激烈");
     } else if (ratio > 1.2) {
-      lines.push('市场供大于求，竞争比较激烈，不好做');
+      lines.push("市场供大于求，竞争比较激烈，不好做");
     } else if (ratio > 0.9) {
-      lines.push('市场供需基本平衡，有一定竞争但还有空间');
+      lines.push("市场供需基本平衡，有一定竞争但还有空间");
     } else if (ratio > 0.6) {
-      lines.push('市场需求旺盛，供给不太够，机会不错');
+      lines.push("市场需求旺盛，供给不太够，机会不错");
     } else {
-      lines.push('市场需求远大于供给，是个好市场');
+      lines.push("市场需求远大于供给，是个好市场");
     }
-    lines.push(`堂食收入：约${Math.round(supplyDemandResult.dineInRevenue / 100) * 100}元`);
-    lines.push(`外卖收入：约${Math.round(supplyDemandResult.deliveryRevenue / 100) * 100}元`);
+    lines.push(
+      `堂食收入：约${Math.round(supplyDemandResult.dineInRevenue / 100) * 100}元`,
+    );
+    lines.push(
+      `外卖收入：约${Math.round(supplyDemandResult.deliveryRevenue / 100) * 100}元`,
+    );
     // 瓶颈用自然语言
     const bottleneck = supplyDemandResult.overallBottleneck.description;
     if (bottleneck) {
@@ -481,24 +615,31 @@ export function serializeGameState(
 
   // 营销活动
   if (gameState.activeMarketingActivities.length > 0) {
-    lines.push('');
-    lines.push('【进行中的营销活动】');
-    gameState.activeMarketingActivities.forEach(a => {
+    lines.push("");
+    lines.push("【进行中的营销活动】");
+    gameState.activeMarketingActivities.forEach((a) => {
       lines.push(`- ${a.name}（周费用${a.weeklyCost}元）`);
     });
   }
 
   // 经营诊断（来自 healthCheck 引擎的自动诊断结果）
   if (healthAlerts && healthAlerts.length > 0) {
-    lines.push('');
-    lines.push('【经营诊断】以下是当前检测到的核心问题，你的建议应优先针对这些问题：');
-    healthAlerts.forEach(alert => {
-      const severityLabel = alert.severity === 'critical' ? '🔴严重' : alert.severity === 'warning' ? '🟡注意' : '🔵提示';
+    lines.push("");
+    lines.push(
+      "【经营诊断】以下是当前检测到的核心问题，你的建议应优先针对这些问题：",
+    );
+    healthAlerts.forEach((alert) => {
+      const severityLabel =
+        alert.severity === "critical"
+          ? "🔴严重"
+          : alert.severity === "warning"
+            ? "🟡注意"
+            : "🔵提示";
       lines.push(`- ${severityLabel} ${alert.title}：${alert.message}`);
     });
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 // ============ 构建完整 messages ============
@@ -508,13 +649,18 @@ export function buildMessages(
   currentStats: CurrentStats,
   supplyDemandResult: SupplyDemandResult | null,
   healthAlerts?: HealthAlert[],
-): { role: 'system' | 'user'; content: string }[] {
-  const stateText = serializeGameState(gameState, currentStats, supplyDemandResult, healthAlerts);
+): { role: "system" | "user"; content: string }[] {
+  const stateText = serializeGameState(
+    gameState,
+    currentStats,
+    supplyDemandResult,
+    healthAlerts,
+  );
 
   return [
-    { role: 'system', content: YONGGE_SYSTEM_PROMPT },
+    { role: "system", content: YONGGE_SYSTEM_PROMPT },
     {
-      role: 'user',
+      role: "user",
       content: `以下是我的餐饮店经营数据，请按照你的诊断流程帮我分析：\n\n${stateText}`,
     },
   ];

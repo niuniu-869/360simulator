@@ -1,12 +1,34 @@
-import type { GameState, CognitionLevel } from '@/types/game';
-import { TrendingUp, TrendingDown, DollarSign, PieChart as PieChartIcon, BarChart3, AlertCircle, Lock, Eye, Target, Flame } from 'lucide-react';
-import { INFO_FUZZ_CONFIG } from '@/data/cognitionData';
+import type { GameState, CognitionLevel } from "@/types/game";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, ReferenceLine,
-  LineChart, Line, PieChart, Pie,
-  AreaChart, Area,
-} from 'recharts';
-import { WIN_STREAK } from '@/lib/gameEngine';
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  PieChart as PieChartIcon,
+  BarChart3,
+  AlertCircle,
+  Lock,
+  Eye,
+  Target,
+  Flame,
+} from "lucide-react";
+import { INFO_FUZZ_CONFIG } from "@/data/cognitionData";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+  ReferenceLine,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  AreaChart,
+  Area,
+} from "recharts";
+import { WIN_STREAK } from "@/lib/gameEngine";
 
 // 信息模糊化工具函数
 type FuzzResult = {
@@ -19,43 +41,41 @@ function applyFuzz(
   infoType: string,
   value: number,
   cognitionLevel: CognitionLevel,
-  formatFn: (v: number) => string
+  formatFn: (v: number) => string,
 ): FuzzResult {
-  const config = INFO_FUZZ_CONFIG.find(c => c.infoType === infoType);
+  const config = INFO_FUZZ_CONFIG.find((c) => c.infoType === infoType);
   if (!config) {
     return { display: formatFn(value), isHidden: false, isFuzzy: false };
   }
 
-  const fuzzLevel = config.fuzzLevels.find(f => f.level === cognitionLevel);
+  const fuzzLevel = config.fuzzLevels.find((f) => f.level === cognitionLevel);
   if (!fuzzLevel) {
     return { display: formatFn(value), isHidden: false, isFuzzy: false };
   }
 
   switch (fuzzLevel.type) {
-    case 'hidden':
-      return { display: '???', isHidden: true, isFuzzy: false };
-    case 'fuzzy':
-      {
-        const words = fuzzLevel.fuzzyWords || ['未知'];
-        let wordIndex = 0;
-        if (value > 0) wordIndex = 0;
-        else if (value < 0) wordIndex = Math.min(2, words.length - 1);
-        else wordIndex = Math.min(1, words.length - 1);
-        return { display: words[wordIndex], isHidden: false, isFuzzy: true };
-      }
-    case 'range':
-      {
-        const minRatio = fuzzLevel.minRatio || 0.8;
-        const maxRatio = fuzzLevel.maxRatio || 1.2;
-        const minVal = value * minRatio;
-        const maxVal = value * maxRatio;
-        return {
-          display: `${formatFn(minVal)} ~ ${formatFn(maxVal)}`,
-          isHidden: false,
-          isFuzzy: true
-        };
-      }
-    case 'exact':
+    case "hidden":
+      return { display: "???", isHidden: true, isFuzzy: false };
+    case "fuzzy": {
+      const words = fuzzLevel.fuzzyWords || ["未知"];
+      let wordIndex = 0;
+      if (value > 0) wordIndex = 0;
+      else if (value < 0) wordIndex = Math.min(2, words.length - 1);
+      else wordIndex = Math.min(1, words.length - 1);
+      return { display: words[wordIndex], isHidden: false, isFuzzy: true };
+    }
+    case "range": {
+      const minRatio = fuzzLevel.minRatio || 0.8;
+      const maxRatio = fuzzLevel.maxRatio || 1.2;
+      const minVal = value * minRatio;
+      const maxVal = value * maxRatio;
+      return {
+        display: `${formatFn(minVal)} ~ ${formatFn(maxVal)}`,
+        isHidden: false,
+        isFuzzy: true,
+      };
+    }
+    case "exact":
     default:
       return { display: formatFn(value), isHidden: false, isFuzzy: false };
   }
@@ -68,6 +88,8 @@ interface FixedCostBreakdown {
   marketing: number;
   depreciation: number;
   promotion: number;
+  holding?: number;
+  activityMarketing?: number;
   total: number;
 }
 
@@ -76,18 +98,25 @@ interface FinanceDashboardProps {
   currentStats: {
     revenue: number;
     variableCost: number;
+    cogs?: number; // 销售成本（原料+损耗），v2 新增
     fixedCost: number;
     fixedCostBreakdown: FixedCostBreakdown;
     profit: number;
-    margin: number;
+    margin: number; // 贡献毛益率
+    grossMargin?: number; // 毛利率（销售毛利），v2 新增
     breakEvenPoint: number;
   };
 }
 
 // Recharts 通用样式
-const TOOLTIP_STYLE = { background: '#0a0e17', border: '1px solid #1e293b', borderRadius: 0, fontSize: 12 };
-const AXIS_TICK = { fill: '#64748b', fontSize: 11 };
-const AXIS_LINE = { stroke: '#1e293b' };
+const TOOLTIP_STYLE = {
+  background: "#0a0e17",
+  border: "1px solid #1e293b",
+  borderRadius: 0,
+  fontSize: 12,
+};
+const AXIS_TICK = { fill: "#64748b", fontSize: 11 };
+const AXIS_LINE = { stroke: "#1e293b" };
 
 const formatMoney = (amount: number) => {
   if (amount >= 10000 || amount <= -10000) {
@@ -99,37 +128,100 @@ const formatMoney = (amount: number) => {
 const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
 // 饼图颜色
-const PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#8b5cf6'];
+const PIE_COLORS = ["#ef4444", "#f97316", "#eab308", "#3b82f6", "#8b5cf6"];
 
-export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardProps) {
+export function FinanceDashboard({
+  gameState,
+  currentStats,
+}: FinanceDashboardProps) {
   const cognitionLevel = (gameState.cognition?.level || 0) as CognitionLevel;
 
   // 应用模糊化到各项数据
-  const revenueFuzz = applyFuzz('weeklyRevenue', currentStats.revenue, cognitionLevel, formatMoney);
-  const profitFuzz = applyFuzz('netProfit', currentStats.profit, cognitionLevel, formatMoney);
-  const marginFuzz = applyFuzz('grossMargin', currentStats.margin, cognitionLevel, formatPercent);
-  const breakEvenFuzz = applyFuzz('breakEvenPoint', currentStats.breakEvenPoint, cognitionLevel, formatMoney);
-  const variableCostFuzz = applyFuzz('variableCost', currentStats.variableCost, cognitionLevel, formatMoney);
-  const fixedCostFuzz = applyFuzz('fixedCost', currentStats.fixedCost, cognitionLevel, formatMoney);
+  const revenueFuzz = applyFuzz(
+    "weeklyRevenue",
+    currentStats.revenue,
+    cognitionLevel,
+    formatMoney,
+  );
+  const profitFuzz = applyFuzz(
+    "netProfit",
+    currentStats.profit,
+    cognitionLevel,
+    formatMoney,
+  );
+  // 真·毛利率（销售毛利率 = (Rev - COGS) / Rev）— 优先显示 grossMargin；fallback 到 margin 保兼容
+  const grossMarginValue = currentStats.grossMargin ?? currentStats.margin;
+  const marginFuzz = applyFuzz(
+    "grossMargin",
+    grossMarginValue,
+    cognitionLevel,
+    formatPercent,
+  );
+  // 贡献毛益率（用于 BEP 计算）— 独立展示以教学管理会计两种"毛利"口径差异
+  const contributionMarginFuzz = applyFuzz(
+    "grossMargin",
+    currentStats.margin,
+    cognitionLevel,
+    formatPercent,
+  );
+  const breakEvenFuzz = applyFuzz(
+    "breakEvenPoint",
+    currentStats.breakEvenPoint,
+    cognitionLevel,
+    formatMoney,
+  );
+  const variableCostFuzz = applyFuzz(
+    "variableCost",
+    currentStats.variableCost,
+    cognitionLevel,
+    formatMoney,
+  );
+  const fixedCostFuzz = applyFuzz(
+    "fixedCost",
+    currentStats.fixedCost,
+    cognitionLevel,
+    formatMoney,
+  );
 
   // 计算各项占比
-  const variableCostRatio = currentStats.revenue > 0 ? (currentStats.variableCost / currentStats.revenue) * 100 : 0;
-  const fixedCostRatio = currentStats.revenue > 0 ? (currentStats.fixedCost / currentStats.revenue) * 100 : 0;
-  const profitRatio = currentStats.revenue > 0 ? (currentStats.profit / currentStats.revenue) * 100 : 0;
+  const variableCostRatio =
+    currentStats.revenue > 0
+      ? (currentStats.variableCost / currentStats.revenue) * 100
+      : 0;
+  const fixedCostRatio =
+    currentStats.revenue > 0
+      ? (currentStats.fixedCost / currentStats.revenue) * 100
+      : 0;
+  const profitRatio =
+    currentStats.revenue > 0
+      ? (currentStats.profit / currentStats.revenue) * 100
+      : 0;
 
   // 盈亏平衡：检测 Infinity / NaN
-  const isBreakEvenInvalid = !isFinite(currentStats.breakEvenPoint) || currentStats.margin <= 0;
-  const breakEvenDays = (!isBreakEvenInvalid && currentStats.revenue > 0)
-    ? (currentStats.breakEvenPoint / currentStats.revenue) * 30
-    : Infinity;
+  const isBreakEvenInvalid =
+    !isFinite(currentStats.breakEvenPoint) || currentStats.margin <= 0;
+  const breakEvenDays =
+    !isBreakEvenInvalid && currentStats.revenue > 0
+      ? (currentStats.breakEvenPoint / currentStats.revenue) * 30
+      : Infinity;
 
   // 回本进度
-  const returnProgress = gameState.totalInvestment > 0
-    ? Math.min(100, Math.max(0, (gameState.cumulativeProfit / gameState.totalInvestment) * 100))
-    : 0;
+  const returnProgress =
+    gameState.totalInvestment > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            (gameState.cumulativeProfit / gameState.totalInvestment) * 100,
+          ),
+        )
+      : 0;
 
   // 历史数据（Recharts 格式）
-  const profitChartData = gameState.profitHistory.map((profit, i) => ({ week: `${i + 1}`, profit }));
+  const profitChartData = gameState.profitHistory.map((profit, i) => ({
+    week: `${i + 1}`,
+    profit,
+  }));
 
   const trendChartData = (gameState.revenueHistory || []).map((rev, i) => ({
     week: `${i + 1}`,
@@ -143,15 +235,25 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
     cash,
   }));
 
-  // 成本结构饼图数据
+  // 成本结构饼图数据（含新拆出的"库存持有"和"营销活动费"两类固定成本）
   const costPieData = [
-    { name: '变动成本', value: currentStats.variableCost },
-    { name: '租金', value: currentStats.fixedCostBreakdown.rent },
-    { name: '人工', value: currentStats.fixedCostBreakdown.salary },
-    { name: '水电杂费', value: currentStats.fixedCostBreakdown.utilities + currentStats.fixedCostBreakdown.marketing },
-    { name: '设备折旧', value: currentStats.fixedCostBreakdown.depreciation },
-    { name: '外卖推广', value: currentStats.fixedCostBreakdown.promotion },
-  ].filter(d => d.value > 0);
+    { name: "变动成本", value: currentStats.variableCost },
+    { name: "租金", value: currentStats.fixedCostBreakdown.rent },
+    { name: "人工", value: currentStats.fixedCostBreakdown.salary },
+    {
+      name: "水电杂费",
+      value:
+        currentStats.fixedCostBreakdown.utilities +
+        currentStats.fixedCostBreakdown.marketing,
+    },
+    { name: "设备折旧", value: currentStats.fixedCostBreakdown.depreciation },
+    { name: "外卖推广", value: currentStats.fixedCostBreakdown.promotion },
+    { name: "库存持有", value: currentStats.fixedCostBreakdown.holding ?? 0 },
+    {
+      name: "营销活动",
+      value: currentStats.fixedCostBreakdown.activityMarketing ?? 0,
+    },
+  ].filter((d) => d.value > 0);
   const totalCost = costPieData.reduce((s, d) => s + d.value, 0);
 
   return (
@@ -167,9 +269,13 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
             <TrendingUp className="w-4 h-4 text-emerald-500" />
             <span className="text-xs text-slate-400">周收入</span>
             {revenueFuzz.isFuzzy && <Eye className="w-3 h-3 text-amber-500" />}
-            {revenueFuzz.isHidden && <Lock className="w-3 h-3 text-slate-500" />}
+            {revenueFuzz.isHidden && (
+              <Lock className="w-3 h-3 text-slate-500" />
+            )}
           </div>
-          <p className={`text-2xl font-mono font-bold ${revenueFuzz.isHidden ? 'text-slate-500' : 'text-emerald-400'}`}>
+          <p
+            className={`text-2xl font-mono font-bold ${revenueFuzz.isHidden ? "text-slate-500" : "text-emerald-400"}`}
+          >
             {revenueFuzz.display}
           </p>
         </div>
@@ -178,14 +284,22 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
           <div className="flex items-center gap-2 mb-2">
             <DollarSign className="w-4 h-4 text-red-500" />
             <span className="text-xs text-slate-400">变动成本</span>
-            {variableCostFuzz.isFuzzy && <Eye className="w-3 h-3 text-amber-500" />}
-            {variableCostFuzz.isHidden && <Lock className="w-3 h-3 text-slate-500" />}
+            {variableCostFuzz.isFuzzy && (
+              <Eye className="w-3 h-3 text-amber-500" />
+            )}
+            {variableCostFuzz.isHidden && (
+              <Lock className="w-3 h-3 text-slate-500" />
+            )}
           </div>
-          <p className={`text-2xl font-mono font-bold ${variableCostFuzz.isHidden ? 'text-slate-500' : 'text-red-400'}`}>
+          <p
+            className={`text-2xl font-mono font-bold ${variableCostFuzz.isHidden ? "text-slate-500" : "text-red-400"}`}
+          >
             {variableCostFuzz.display}
           </p>
           {!variableCostFuzz.isHidden && (
-            <p className="text-xs text-slate-500">{variableCostRatio.toFixed(1)}% of 收入</p>
+            <p className="text-xs text-slate-500">
+              {variableCostRatio.toFixed(1)}% of 收入
+            </p>
           )}
         </div>
 
@@ -193,14 +307,22 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
           <div className="flex items-center gap-2 mb-2">
             <PieChartIcon className="w-4 h-4 text-orange-500" />
             <span className="text-xs text-slate-400">固定成本</span>
-            {fixedCostFuzz.isFuzzy && <Eye className="w-3 h-3 text-amber-500" />}
-            {fixedCostFuzz.isHidden && <Lock className="w-3 h-3 text-slate-500" />}
+            {fixedCostFuzz.isFuzzy && (
+              <Eye className="w-3 h-3 text-amber-500" />
+            )}
+            {fixedCostFuzz.isHidden && (
+              <Lock className="w-3 h-3 text-slate-500" />
+            )}
           </div>
-          <p className={`text-2xl font-mono font-bold ${fixedCostFuzz.isHidden ? 'text-slate-500' : 'text-orange-400'}`}>
+          <p
+            className={`text-2xl font-mono font-bold ${fixedCostFuzz.isHidden ? "text-slate-500" : "text-orange-400"}`}
+          >
             {fixedCostFuzz.display}
           </p>
           {!fixedCostFuzz.isHidden && (
-            <p className="text-xs text-slate-500">{fixedCostRatio.toFixed(1)}% of 收入</p>
+            <p className="text-xs text-slate-500">
+              {fixedCostRatio.toFixed(1)}% of 收入
+            </p>
           )}
         </div>
 
@@ -215,14 +337,21 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
             {profitFuzz.isFuzzy && <Eye className="w-3 h-3 text-amber-500" />}
             {profitFuzz.isHidden && <Lock className="w-3 h-3 text-slate-500" />}
           </div>
-          <p className={`text-2xl font-mono font-bold ${
-            profitFuzz.isHidden ? 'text-slate-500' :
-            currentStats.profit >= 0 ? 'text-emerald-400' : 'text-red-400'
-          }`}>
+          <p
+            className={`text-2xl font-mono font-bold ${
+              profitFuzz.isHidden
+                ? "text-slate-500"
+                : currentStats.profit >= 0
+                  ? "text-emerald-400"
+                  : "text-red-400"
+            }`}
+          >
             {profitFuzz.display}
           </p>
           {!profitFuzz.isHidden && (
-            <p className={`text-xs ${currentStats.profit >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            <p
+              className={`text-xs ${currentStats.profit >= 0 ? "text-emerald-500" : "text-red-500"}`}
+            >
               {profitRatio.toFixed(1)}% 利润率
             </p>
           )}
@@ -235,18 +364,21 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
           <div className="flex items-center gap-2 mb-3">
             <Target className="w-4 h-4 text-blue-500" />
             <span className="text-sm font-bold text-white">回本进度</span>
-            <span className="ml-auto text-sm font-mono text-blue-400">{returnProgress.toFixed(0)}%</span>
+            <span className="ml-auto text-sm font-mono text-blue-400">
+              {returnProgress.toFixed(0)}%
+            </span>
           </div>
           <div className="h-3 bg-[#0a0e17] border border-[#1e293b] overflow-hidden">
             <div
               className="h-full transition-all duration-500"
               style={{
                 width: `${returnProgress}%`,
-                background: returnProgress >= 100
-                  ? 'linear-gradient(90deg, #10b981, #34d399)'
-                  : returnProgress >= 50
-                    ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
-                    : 'linear-gradient(90deg, #f97316, #fb923c)',
+                background:
+                  returnProgress >= 100
+                    ? "linear-gradient(90deg, #10b981, #34d399)"
+                    : returnProgress >= 50
+                      ? "linear-gradient(90deg, #3b82f6, #60a5fa)"
+                      : "linear-gradient(90deg, #f97316, #fb923c)",
               }}
             />
           </div>
@@ -270,15 +402,15 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
                 key={i}
                 className={`flex-1 h-3 border ${
                   i < (gameState.consecutiveProfits || 0)
-                    ? 'bg-emerald-500/70 border-emerald-500/50'
-                    : 'bg-[#0a0e17] border-[#1e293b]'
+                    ? "bg-emerald-500/70 border-emerald-500/50"
+                    : "bg-[#0a0e17] border-[#1e293b]"
                 }`}
               />
             ))}
           </div>
           <p className="text-xs text-slate-500 mt-1.5">
             {(gameState.consecutiveProfits || 0) >= WIN_STREAK
-              ? '已达标 ✓'
+              ? "已达标 ✓"
               : `还需连续盈利 ${WIN_STREAK - (gameState.consecutiveProfits || 0)} 周`}
           </p>
         </div>
@@ -307,32 +439,49 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
                     strokeWidth={2}
                   >
                     {costPieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} fillOpacity={0.75} />
+                      <Cell
+                        key={i}
+                        fill={PIE_COLORS[i % PIE_COLORS.length]}
+                        fillOpacity={0.75}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
-                    formatter={(value: number) => [formatMoney(value), '']}
+                    formatter={(value: number) => [formatMoney(value), ""]}
                   />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-2">
                 {costPieData.map((d, i) => (
-                  <div key={d.name} className="flex items-center justify-between text-xs">
+                  <div
+                    key={d.name}
+                    className="flex items-center justify-between text-xs"
+                  >
                     <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5" style={{ background: PIE_COLORS[i % PIE_COLORS.length], opacity: 0.75 }} />
+                      <div
+                        className="w-2.5 h-2.5"
+                        style={{
+                          background: PIE_COLORS[i % PIE_COLORS.length],
+                          opacity: 0.75,
+                        }}
+                      />
                       <span className="text-slate-400">{d.name}</span>
                     </div>
                     <span className="font-mono text-slate-300">
                       {formatMoney(d.value)}
-                      <span className="text-slate-500 ml-1">({(d.value / totalCost * 100).toFixed(0)}%)</span>
+                      <span className="text-slate-500 ml-1">
+                        ({((d.value / totalCost) * 100).toFixed(0)}%)
+                      </span>
                     </span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-500 text-center py-8">暂无成本数据</p>
+            <p className="text-sm text-slate-500 text-center py-8">
+              暂无成本数据
+            </p>
           )}
         </div>
 
@@ -346,39 +495,73 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
             <div className="bg-[#0a0e17] p-4 border border-[#1e293b]">
               <div className="flex items-center gap-2 mb-1">
                 <p className="text-xs text-slate-400">毛利率</p>
-                {marginFuzz.isFuzzy && <Eye className="w-3 h-3 text-amber-500" />}
-                {marginFuzz.isHidden && <Lock className="w-3 h-3 text-slate-500" />}
+                <span className="text-[10px] text-slate-500">
+                  (Rev − COGS) / Rev
+                </span>
+                {marginFuzz.isFuzzy && (
+                  <Eye className="w-3 h-3 text-amber-500" />
+                )}
+                {marginFuzz.isHidden && (
+                  <Lock className="w-3 h-3 text-slate-500" />
+                )}
               </div>
-              <p className={`text-3xl font-mono font-bold ${marginFuzz.isHidden ? 'text-slate-500' : 'text-orange-400'}`}>
+              <p
+                className={`text-3xl font-mono font-bold ${marginFuzz.isHidden ? "text-slate-500" : "text-orange-400"}`}
+              >
                 {marginFuzz.display}
               </p>
               {!marginFuzz.isHidden && (
                 <p className="text-xs text-slate-500">
-                  每卖100元，毛利{currentStats.margin.toFixed(0)}元
+                  每卖100元，扣原料损耗后剩 {grossMarginValue.toFixed(0)} 元
                 </p>
+              )}
+              {/* 贡献毛益率：用于盈亏平衡计算，剔除全部变动成本（含佣金/抽成） */}
+              {!marginFuzz.isHidden && (
+                <div className="mt-2 pt-2 border-t border-[#1e293b]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-500">
+                      贡献毛益率
+                    </span>
+                    <span className="text-sm font-mono text-cyan-400">
+                      {contributionMarginFuzz.display}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-600">
+                    扣全部变动成本（含佣金/抽成），用于 BEP
+                  </p>
+                </div>
               )}
             </div>
 
             <div className="bg-[#0a0e17] p-4 border border-[#1e293b]">
               <div className="flex items-center gap-2 mb-1">
                 <p className="text-xs text-slate-400">盈亏平衡收入</p>
-                {breakEvenFuzz.isFuzzy && <Eye className="w-3 h-3 text-amber-500" />}
-                {breakEvenFuzz.isHidden && <Lock className="w-3 h-3 text-slate-500" />}
+                {breakEvenFuzz.isFuzzy && (
+                  <Eye className="w-3 h-3 text-amber-500" />
+                )}
+                {breakEvenFuzz.isHidden && (
+                  <Lock className="w-3 h-3 text-slate-500" />
+                )}
               </div>
               {isBreakEvenInvalid && !breakEvenFuzz.isHidden ? (
                 <>
                   <p className="text-2xl font-bold text-red-400">无法保本</p>
                   <p className="text-xs text-red-400/70">
-                    当前毛利率{currentStats.margin <= 0 ? '为负' : '过低'}，无法覆盖固定成本
+                    当前毛利率{currentStats.margin <= 0 ? "为负" : "过低"}
+                    ，无法覆盖固定成本
                   </p>
                 </>
               ) : (
                 <>
-                  <p className={`text-3xl font-mono font-bold ${breakEvenFuzz.isHidden ? 'text-slate-500' : 'text-blue-400'}`}>
+                  <p
+                    className={`text-3xl font-mono font-bold ${breakEvenFuzz.isHidden ? "text-slate-500" : "text-blue-400"}`}
+                  >
                     {breakEvenFuzz.display}
                   </p>
                   {!breakEvenFuzz.isHidden && (
-                    <p className="text-xs text-slate-500">每周需达到此收入才能保本</p>
+                    <p className="text-xs text-slate-500">
+                      每周需达到此收入才能保本
+                    </p>
                   )}
                 </>
               )}
@@ -389,11 +572,15 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
               {isBreakEvenInvalid ? (
                 <>
                   <p className="text-3xl font-mono font-bold text-red-400">∞</p>
-                  <p className="text-xs text-red-400/70">需先提升毛利率至正值</p>
+                  <p className="text-xs text-red-400/70">
+                    需先提升毛利率至正值
+                  </p>
                 </>
               ) : (
                 <>
-                  <p className={`text-3xl font-mono font-bold ${breakEvenDays <= 20 ? 'text-emerald-400' : breakEvenDays <= 25 ? 'text-amber-400' : 'text-red-400'}`}>
+                  <p
+                    className={`text-3xl font-mono font-bold ${breakEvenDays <= 20 ? "text-emerald-400" : breakEvenDays <= 25 ? "text-amber-400" : "text-red-400"}`}
+                  >
                     {breakEvenDays.toFixed(1)}天
                   </p>
                   <p className="text-xs text-slate-500">
@@ -411,21 +598,39 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
         <div className="ark-card p-5">
           <h3 className="font-bold text-white mb-4">历史利润</h3>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={profitChartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-              <XAxis dataKey="week" tick={AXIS_TICK} tickLine={false} axisLine={AXIS_LINE} />
+            <BarChart
+              data={profitChartData}
+              margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+            >
+              <XAxis
+                dataKey="week"
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={AXIS_LINE}
+              />
               <YAxis
-                tick={AXIS_TICK} tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => v >= 10000 || v <= -10000 ? `${(v / 10000).toFixed(1)}万` : `${v}`}
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: number) =>
+                  v >= 10000 || v <= -10000
+                    ? `${(v / 10000).toFixed(1)}万`
+                    : `${v}`
+                }
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 labelFormatter={(label: string) => `第${label}周`}
-                formatter={(value: number) => [formatMoney(value), '利润']}
+                formatter={(value: number) => [formatMoney(value), "利润"]}
               />
               <ReferenceLine y={0} stroke="#1e293b" />
               <Bar dataKey="profit" radius={[2, 2, 0, 0]}>
                 {gameState.profitHistory.map((profit, i) => (
-                  <Cell key={i} fill={profit >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.7} />
+                  <Cell
+                    key={i}
+                    fill={profit >= 0 ? "#10b981" : "#ef4444"}
+                    fillOpacity={0.7}
+                  />
                 ))}
               </Bar>
             </BarChart>
@@ -438,7 +643,10 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
         <div className="ark-card p-5">
           <h3 className="font-bold text-white mb-4">收入 · 成本 · 利润趋势</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={trendChartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+            <AreaChart
+              data={trendChartData}
+              margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+            >
               <defs>
                 <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -449,29 +657,73 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
                   <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="week" tick={AXIS_TICK} tickLine={false} axisLine={AXIS_LINE} />
+              <XAxis
+                dataKey="week"
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={AXIS_LINE}
+              />
               <YAxis
-                tick={AXIS_TICK} tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => v >= 10000 || v <= -10000 ? `${(v / 10000).toFixed(1)}万` : `${v}`}
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: number) =>
+                  v >= 10000 || v <= -10000
+                    ? `${(v / 10000).toFixed(1)}万`
+                    : `${v}`
+                }
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 labelFormatter={(label: string) => `第${label}周`}
                 formatter={(value: number, name: string) => {
-                  const labels: Record<string, string> = { revenue: '收入', cost: '总成本', profit: '利润' };
+                  const labels: Record<string, string> = {
+                    revenue: "收入",
+                    cost: "总成本",
+                    profit: "利润",
+                  };
                   return [formatMoney(value), labels[name] || name];
                 }}
               />
               <ReferenceLine y={0} stroke="#1e293b" />
-              <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#gradRevenue)" strokeWidth={2} />
-              <Area type="monotone" dataKey="cost" stroke="#ef4444" fill="url(#gradCost)" strokeWidth={1.5} strokeDasharray="4 2" />
-              <Line type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={2} dot={false} />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                stroke="#10b981"
+                fill="url(#gradRevenue)"
+                strokeWidth={2}
+              />
+              <Area
+                type="monotone"
+                dataKey="cost"
+                stroke="#ef4444"
+                fill="url(#gradCost)"
+                strokeWidth={1.5}
+                strokeDasharray="4 2"
+              />
+              <Line
+                type="monotone"
+                dataKey="profit"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={false}
+              />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center gap-4 mt-2 justify-center text-xs text-slate-500">
-            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-emerald-500 inline-block" /> 收入</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-red-500 inline-block opacity-70" style={{ borderTop: '1px dashed #ef4444' }} /> 总成本</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-500 inline-block" /> 利润</span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-emerald-500 inline-block" /> 收入
+            </span>
+            <span className="flex items-center gap-1">
+              <span
+                className="w-3 h-0.5 bg-red-500 inline-block opacity-70"
+                style={{ borderTop: "1px dashed #ef4444" }}
+              />{" "}
+              总成本
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-0.5 bg-blue-500 inline-block" /> 利润
+            </span>
           </div>
         </div>
       )}
@@ -481,19 +733,44 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
         <div className="ark-card p-5">
           <h3 className="font-bold text-white mb-4">现金余额趋势</h3>
           <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={cashChartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-              <XAxis dataKey="week" tick={AXIS_TICK} tickLine={false} axisLine={AXIS_LINE} />
+            <LineChart
+              data={cashChartData}
+              margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+            >
+              <XAxis
+                dataKey="week"
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={AXIS_LINE}
+              />
               <YAxis
-                tick={AXIS_TICK} tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => v >= 10000 || v <= -10000 ? `${(v / 10000).toFixed(1)}万` : `${v}`}
+                tick={AXIS_TICK}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: number) =>
+                  v >= 10000 || v <= -10000
+                    ? `${(v / 10000).toFixed(1)}万`
+                    : `${v}`
+                }
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
                 labelFormatter={(label: string) => `第${label}周末`}
-                formatter={(value: number) => [formatMoney(value), '现金余额']}
+                formatter={(value: number) => [formatMoney(value), "现金余额"]}
               />
-              <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.5} />
-              <Line type="monotone" dataKey="cash" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+              <ReferenceLine
+                y={0}
+                stroke="#ef4444"
+                strokeDasharray="3 3"
+                strokeOpacity={0.5}
+              />
+              <Line
+                type="monotone"
+                dataKey="cash"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                dot={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -508,51 +785,111 @@ export function FinanceDashboard({ gameState, currentStats }: FinanceDashboardPr
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center p-3 bg-[#0a0e17] border border-[#1e293b]">
             <p className="text-xs text-slate-400 mb-1">毛利率</p>
-            <p className={`text-lg font-mono font-bold ${currentStats.margin >= 50 ? 'text-emerald-400' : currentStats.margin >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
-              {currentStats.margin >= 50 ? '健康' : currentStats.margin >= 30 ? '一般' : '危险'}
+            <p
+              className={`text-lg font-mono font-bold ${grossMarginValue >= 55 ? "text-emerald-400" : grossMarginValue >= 40 ? "text-amber-400" : "text-red-400"}`}
+            >
+              {grossMarginValue >= 55
+                ? "健康"
+                : grossMarginValue >= 40
+                  ? "一般"
+                  : "危险"}
             </p>
-            <p className="text-xs text-slate-500">{currentStats.margin.toFixed(0)}%</p>
+            <p className="text-xs text-slate-500">
+              {grossMarginValue.toFixed(0)}%
+            </p>
           </div>
           <div className="text-center p-3 bg-[#0a0e17] border border-[#1e293b]">
             <p className="text-xs text-slate-400 mb-1">人工占比</p>
             {currentStats.revenue > 0 ? (
-              <p className={`text-lg font-mono font-bold ${
-                (currentStats.fixedCostBreakdown.salary / currentStats.revenue) <= 0.2 ? 'text-emerald-400' :
-                (currentStats.fixedCostBreakdown.salary / currentStats.revenue) <= 0.3 ? 'text-amber-400' : 'text-red-400'
-              }`}>
-                {(currentStats.fixedCostBreakdown.salary / currentStats.revenue) <= 0.2 ? '健康' :
-                 (currentStats.fixedCostBreakdown.salary / currentStats.revenue) <= 0.3 ? '一般' : '危险'}
+              <p
+                className={`text-lg font-mono font-bold ${
+                  currentStats.fixedCostBreakdown.salary /
+                    currentStats.revenue <=
+                  0.2
+                    ? "text-emerald-400"
+                    : currentStats.fixedCostBreakdown.salary /
+                          currentStats.revenue <=
+                        0.3
+                      ? "text-amber-400"
+                      : "text-red-400"
+                }`}
+              >
+                {currentStats.fixedCostBreakdown.salary /
+                  currentStats.revenue <=
+                0.2
+                  ? "健康"
+                  : currentStats.fixedCostBreakdown.salary /
+                        currentStats.revenue <=
+                      0.3
+                    ? "一般"
+                    : "危险"}
               </p>
             ) : (
               <p className="text-lg font-mono font-bold text-slate-500">-</p>
             )}
             <p className="text-xs text-slate-500">
-              {currentStats.revenue > 0 ? ((currentStats.fixedCostBreakdown.salary / currentStats.revenue) * 100).toFixed(0) : 0}%
+              {currentStats.revenue > 0
+                ? (
+                    (currentStats.fixedCostBreakdown.salary /
+                      currentStats.revenue) *
+                    100
+                  ).toFixed(0)
+                : 0}
+              %
             </p>
           </div>
           <div className="text-center p-3 bg-[#0a0e17] border border-[#1e293b]">
             <p className="text-xs text-slate-400 mb-1">租金占比</p>
             {currentStats.revenue > 0 ? (
-              <p className={`text-lg font-mono font-bold ${
-                (currentStats.fixedCostBreakdown.rent / currentStats.revenue) <= 0.1 ? 'text-emerald-400' :
-                (currentStats.fixedCostBreakdown.rent / currentStats.revenue) <= 0.2 ? 'text-amber-400' : 'text-red-400'
-              }`}>
-                {(currentStats.fixedCostBreakdown.rent / currentStats.revenue) <= 0.1 ? '健康' :
-                 (currentStats.fixedCostBreakdown.rent / currentStats.revenue) <= 0.2 ? '一般' : '危险'}
+              <p
+                className={`text-lg font-mono font-bold ${
+                  currentStats.fixedCostBreakdown.rent / currentStats.revenue <=
+                  0.1
+                    ? "text-emerald-400"
+                    : currentStats.fixedCostBreakdown.rent /
+                          currentStats.revenue <=
+                        0.2
+                      ? "text-amber-400"
+                      : "text-red-400"
+                }`}
+              >
+                {currentStats.fixedCostBreakdown.rent / currentStats.revenue <=
+                0.1
+                  ? "健康"
+                  : currentStats.fixedCostBreakdown.rent /
+                        currentStats.revenue <=
+                      0.2
+                    ? "一般"
+                    : "危险"}
               </p>
             ) : (
               <p className="text-lg font-mono font-bold text-slate-500">-</p>
             )}
             <p className="text-xs text-slate-500">
-              {currentStats.revenue > 0 ? ((currentStats.fixedCostBreakdown.rent / currentStats.revenue) * 100).toFixed(0) : 0}%
+              {currentStats.revenue > 0
+                ? (
+                    (currentStats.fixedCostBreakdown.rent /
+                      currentStats.revenue) *
+                    100
+                  ).toFixed(0)
+                : 0}
+              %
             </p>
           </div>
           <div className="text-center p-3 bg-[#0a0e17] border border-[#1e293b]">
             <p className="text-xs text-slate-400 mb-1">整体盈利</p>
-            <p className={`text-lg font-mono font-bold ${currentStats.profit > 0 ? 'text-emerald-400' : currentStats.profit === 0 ? 'text-amber-400' : 'text-red-400'}`}>
-              {currentStats.profit > 0 ? '盈利' : currentStats.profit === 0 ? '持平' : '亏损'}
+            <p
+              className={`text-lg font-mono font-bold ${currentStats.profit > 0 ? "text-emerald-400" : currentStats.profit === 0 ? "text-amber-400" : "text-red-400"}`}
+            >
+              {currentStats.profit > 0
+                ? "盈利"
+                : currentStats.profit === 0
+                  ? "持平"
+                  : "亏损"}
             </p>
-            <p className="text-xs text-slate-500">{formatMoney(currentStats.profit)}</p>
+            <p className="text-xs text-slate-500">
+              {formatMoney(currentStats.profit)}
+            </p>
           </div>
         </div>
       </div>

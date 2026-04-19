@@ -220,7 +220,12 @@ export function calculateFixedCostBreakdown(
     seasonRentMultiplier;
   const rent = monthlyRent / 4;
 
-  const monthlySalary = state.staff.reduce((sum, s) => sum + s.salary, 0);
+  // 薪资：入职期员工按试用期 70% 计薪（真实餐饮试用期惯例）
+  // onboarding 在 staff.onboardingEndsWeek > currentWeek 时为 true；新招员工第1周 70% 薪
+  const monthlySalary = state.staff.reduce(
+    (sum, s) => sum + s.salary * (s.isOnboarding ? 0.7 : 1),
+    0,
+  );
   const salary = monthlySalary / 4;
 
   const utilities = (monthlyRent * 0.2) / 4;
