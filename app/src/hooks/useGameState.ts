@@ -6,7 +6,8 @@
  * 返回接口与重构前完全一致，对 UI 组件零破坏。
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from "react";
+import { usePlaySpeed } from "@/hooks/usePlaySpeed";
 import type {
   GameState,
   Brand,
@@ -21,23 +22,30 @@ import type {
   DeliveryPricingId,
   PackagingTierId,
   SupplyPriority,
-} from '@/types/game';
-import { createInitialGameState } from '@/lib/gameEngine';
-import { dispatch } from '@/lib/gameActions';
+} from "@/types/game";
+import { createInitialGameState } from "@/lib/gameEngine";
+import { dispatch } from "@/lib/gameActions";
 import {
   computeCurrentStats,
   computeSupplyDemandResult,
   computeCanOpen,
   computeGameResult,
-} from '@/lib/gameQuery';
+} from "@/lib/gameQuery";
 
-export function useGameState() {
-  const [gameState, setGameState] = useState<GameState>(createInitialGameState());
+export function useGameState(opts?: { seed?: number }) {
+  const [gameState, setGameState] = useState<GameState>(() =>
+    createInitialGameState(opts?.seed),
+  );
+  const speedCtl = usePlaySpeed();
+  const autoAdvanceRef = useRef<{
+    remaining: number;
+    cancelled: boolean;
+  } | null>(null);
 
   // ============ 辅助：执行 dispatch 并更新 state ============
 
   const act = useCallback((action: Parameters<typeof dispatch>[1]) => {
-    setGameState(prev => {
+    setGameState((prev) => {
       const result = dispatch(prev, action);
       return result.changed ? result.state : prev;
     });
@@ -45,177 +53,353 @@ export function useGameState() {
 
   // ============ 筹备阶段操作 ============
 
-  const selectBrand = useCallback((brand: Brand | null) => {
-    act({ type: 'select_brand', brandId: brand?.id ?? null });
-  }, [act]);
+  const selectBrand = useCallback(
+    (brand: Brand | null) => {
+      act({ type: "select_brand", brandId: brand?.id ?? null });
+    },
+    [act],
+  );
 
-  const selectLocation = useCallback((location: Location | null) => {
-    act({ type: 'select_location', locationId: location?.id ?? null });
-  }, [act]);
+  const selectLocation = useCallback(
+    (location: Location | null) => {
+      act({ type: "select_location", locationId: location?.id ?? null });
+    },
+    [act],
+  );
 
-  const selectAddress = useCallback((address: StoreAddress | null) => {
-    act({ type: 'select_address', addressId: address?.id ?? null });
-  }, [act]);
+  const selectAddress = useCallback(
+    (address: StoreAddress | null) => {
+      act({ type: "select_address", addressId: address?.id ?? null });
+    },
+    [act],
+  );
 
-  const setStoreArea = useCallback((area: number) => {
-    act({ type: 'set_store_area', area });
-  }, [act]);
+  const setStoreArea = useCallback(
+    (area: number) => {
+      act({ type: "set_store_area", area });
+    },
+    [act],
+  );
 
-  const selectDecoration = useCallback((decoration: Decoration | null) => {
-    act({ type: 'select_decoration', decorationId: decoration?.id ?? null });
-  }, [act]);
+  const selectDecoration = useCallback(
+    (decoration: Decoration | null) => {
+      act({ type: "select_decoration", decorationId: decoration?.id ?? null });
+    },
+    [act],
+  );
 
-  const toggleProduct = useCallback((product: Product) => {
-    act({ type: 'toggle_product', productId: product.id });
-  }, [act]);
+  const toggleProduct = useCallback(
+    (product: Product) => {
+      act({ type: "toggle_product", productId: product.id });
+    },
+    [act],
+  );
 
-  const addStaff = useCallback((staffTypeId: string, assignedTask?: string) => {
-    act({ type: 'add_staff', staffTypeId, assignedTask });
-  }, [act]);
+  const addStaff = useCallback(
+    (staffTypeId: string, assignedTask?: string) => {
+      act({ type: "add_staff", staffTypeId, assignedTask });
+    },
+    [act],
+  );
 
-  const fireStaff = useCallback((staffId: string) => {
-    act({ type: 'fire_staff', staffId });
-  }, [act]);
+  const fireStaff = useCallback(
+    (staffId: string) => {
+      act({ type: "fire_staff", staffId });
+    },
+    [act],
+  );
 
-  const openStore = useCallback((season?: Season) => {
-    act({ type: 'open_store', season });
-  }, [act]);
+  const openStore = useCallback(
+    (season?: Season) => {
+      act({ type: "open_store", season });
+    },
+    [act],
+  );
 
   // ============ 经营阶段操作 ============
 
   const nextWeek = useCallback(() => {
-    act({ type: 'next_week' });
+    act({ type: "next_week" });
   }, [act]);
 
-  const restart = useCallback(() => {
-    act({ type: 'restart' });
-  }, [act]);
+  const restart = useCallback(
+    (seed?: number) => {
+      if (seed !== undefined) {
+        setGameState(createInitialGameState(seed));
+      } else {
+        act({ type: "restart" });
+      }
+    },
+    [act],
+  );
 
-  const recruitStaff = useCallback((channelId: string, staffTypeId: string, assignedTask?: string) => {
-    act({ type: 'recruit_staff', channelId, staffTypeId, assignedTask });
-  }, [act]);
+  /**
+   * autoAdvance — Phase 1 自动推进 N 周
+   *  - 自动清弹窗（weeklySummary / lastWeekEvent）
+   *  - 遇到 pendingInteractiveEvent 立刻暂停（等玩家响应）
+   *  - 间隔 = autoAdvanceTickMs（受 speed 影响）
+   */
+  const cancelAutoAdvance = useCallback(() => {
+    if (autoAdvanceRef.current) autoAdvanceRef.current.cancelled = true;
+  }, []);
+
+  const autoAdvance = useCallback(
+    (weeks: number) => {
+      if (!Number.isFinite(weeks) || weeks <= 0) return;
+      if (autoAdvanceRef.current) {
+        autoAdvanceRef.current.remaining += weeks;
+        return;
+      }
+      autoAdvanceRef.current = { remaining: weeks, cancelled: false };
+
+      const tick = () => {
+        const ctx = autoAdvanceRef.current;
+        if (!ctx) return;
+        if (ctx.cancelled || ctx.remaining <= 0) {
+          autoAdvanceRef.current = null;
+          return;
+        }
+        let stopped = false;
+        setGameState((prev) => {
+          if (prev.gamePhase !== "operating") {
+            stopped = true;
+            return prev;
+          }
+          let s = prev;
+          if (s.weeklySummary) {
+            const r = dispatch(s, { type: "clear_weekly_summary" });
+            if (r.changed) s = r.state;
+          }
+          if (s.lastWeekEvent) {
+            const r = dispatch(s, { type: "clear_last_week_event" });
+            if (r.changed) s = r.state;
+          }
+          if (s.pendingInteractiveEvent) {
+            stopped = true;
+            return s;
+          }
+          const r = dispatch(s, { type: "next_week" });
+          if (r.error) {
+            stopped = true;
+            return s;
+          }
+          if (r.changed) s = r.state;
+          return s;
+        });
+        const ctx2 = autoAdvanceRef.current;
+        if (!ctx2) return;
+        if (stopped) {
+          autoAdvanceRef.current = null;
+          return;
+        }
+        ctx2.remaining -= 1;
+        if (ctx2.remaining > 0 && !ctx2.cancelled) {
+          setTimeout(tick, speedCtl.autoAdvanceTickMs);
+        } else {
+          autoAdvanceRef.current = null;
+        }
+      };
+      setTimeout(tick, 0);
+    },
+    [speedCtl.autoAdvanceTickMs],
+  );
+
+  const recruitStaff = useCallback(
+    (channelId: string, staffTypeId: string, assignedTask?: string) => {
+      act({ type: "recruit_staff", channelId, staffTypeId, assignedTask });
+    },
+    [act],
+  );
 
   // ============ 外卖平台管理 ============
 
-  const joinPlatform = useCallback((platformId: string) => {
-    act({ type: 'join_platform', platformId });
-  }, [act]);
+  const joinPlatform = useCallback(
+    (platformId: string) => {
+      act({ type: "join_platform", platformId });
+    },
+    [act],
+  );
 
-  const leavePlatform = useCallback((platformId: string) => {
-    act({ type: 'leave_platform', platformId });
-  }, [act]);
+  const leavePlatform = useCallback(
+    (platformId: string) => {
+      act({ type: "leave_platform", platformId });
+    },
+    [act],
+  );
 
-  const togglePromotion = useCallback((platformId: string, tierIndex: number) => {
-    act({ type: 'toggle_promotion', platformId, tierIndex });
-  }, [act]);
+  const togglePromotion = useCallback(
+    (platformId: string, tierIndex: number) => {
+      act({ type: "toggle_promotion", platformId, tierIndex });
+    },
+    [act],
+  );
 
   // v3.0 外卖运营操作
-  const setDiscountTier = useCallback((platformId: string, tierId: DiscountTierId) => {
-    act({ type: 'set_discount_tier', platformId, tierId });
-  }, [act]);
+  const setDiscountTier = useCallback(
+    (platformId: string, tierId: DiscountTierId) => {
+      act({ type: "set_discount_tier", platformId, tierId });
+    },
+    [act],
+  );
 
-  const setDeliveryPricing = useCallback((platformId: string, pricingId: DeliveryPricingId) => {
-    act({ type: 'set_delivery_pricing', platformId, pricingId });
-  }, [act]);
+  const setDeliveryPricing = useCallback(
+    (platformId: string, pricingId: DeliveryPricingId) => {
+      act({ type: "set_delivery_pricing", platformId, pricingId });
+    },
+    [act],
+  );
 
-  const setPackagingTier = useCallback((platformId: string, tierId: PackagingTierId) => {
-    act({ type: 'set_packaging_tier', platformId, tierId });
-  }, [act]);
+  const setPackagingTier = useCallback(
+    (platformId: string, tierId: PackagingTierId) => {
+      act({ type: "set_packaging_tier", platformId, tierId });
+    },
+    [act],
+  );
 
   // ============ 营销活动管理 ============
 
-  const startMarketingActivity = useCallback((activityId: string) => {
-    act({ type: 'start_marketing', activityId });
-  }, [act]);
+  const startMarketingActivity = useCallback(
+    (activityId: string) => {
+      act({ type: "start_marketing", activityId });
+    },
+    [act],
+  );
 
-  const stopMarketingActivity = useCallback((activityId: string) => {
-    act({ type: 'stop_marketing', activityId });
-  }, [act]);
+  const stopMarketingActivity = useCallback(
+    (activityId: string) => {
+      act({ type: "stop_marketing", activityId });
+    },
+    [act],
+  );
 
   // ============ 定价 & 库存 ============
 
-  const setProductPrice = useCallback((productId: string, price: number) => {
-    act({ type: 'set_product_price', productId, price });
-  }, [act]);
+  const setProductPrice = useCallback(
+    (productId: string, price: number) => {
+      act({ type: "set_product_price", productId, price });
+    },
+    [act],
+  );
 
-  const setProductInventory = useCallback((productId: string, quantity: number) => {
-    act({ type: 'set_product_inventory', productId, quantity });
-  }, [act]);
+  const setProductInventory = useCallback(
+    (productId: string, quantity: number) => {
+      act({ type: "set_product_inventory", productId, quantity });
+    },
+    [act],
+  );
 
-  const setRestockStrategy = useCallback((productId: string, strategy: RestockStrategy) => {
-    act({ type: 'set_restock_strategy', productId, strategy });
-  }, [act]);
+  const setRestockStrategy = useCallback(
+    (productId: string, strategy: RestockStrategy) => {
+      act({ type: "set_restock_strategy", productId, strategy });
+    },
+    [act],
+  );
 
   // ============ 员工任务 ============
 
-  const assignStaffToTask = useCallback((staffId: string, taskType: string) => {
-    act({ type: 'assign_staff_task', staffId, taskType });
-  }, [act]);
+  const assignStaffToTask = useCallback(
+    (staffId: string, taskType: string) => {
+      act({ type: "assign_staff_task", staffId, taskType });
+    },
+    [act],
+  );
 
-  const setStaffWorkHours = useCallback((staffId: string, days: number, hours: number) => {
-    act({ type: 'set_staff_work_hours', staffId, days, hours });
-  }, [act]);
+  const setStaffWorkHours = useCallback(
+    (staffId: string, days: number, hours: number) => {
+      act({ type: "set_staff_work_hours", staffId, days, hours });
+    },
+    [act],
+  );
 
   // ============ v2.7 员工系统升级操作 ============
 
-  const setStaffSalary = useCallback((staffId: string, newSalary: number) => {
-    act({ type: 'set_staff_salary', staffId, newSalary });
-  }, [act]);
+  const setStaffSalary = useCallback(
+    (staffId: string, newSalary: number) => {
+      act({ type: "set_staff_salary", staffId, newSalary });
+    },
+    [act],
+  );
 
-  const staffMoraleAction = useCallback((
-    actionType: 'bonus' | 'team_meal' | 'day_off',
-    targetStaffId?: string,
-    bonusAmount?: number,
-  ) => {
-    act({ type: 'staff_morale_action', actionType, targetStaffId, bonusAmount });
-  }, [act]);
+  const staffMoraleAction = useCallback(
+    (
+      actionType: "bonus" | "team_meal" | "day_off",
+      targetStaffId?: string,
+      bonusAmount?: number,
+    ) => {
+      act({
+        type: "staff_morale_action",
+        actionType,
+        targetStaffId,
+        bonusAmount,
+      });
+    },
+    [act],
+  );
 
-  const retainStaff = useCallback((staffId: string, method: 'raise' | 'reduce_hours' | 'bonus') => {
-    act({ type: 'retain_staff', staffId, method });
-  }, [act]);
+  const retainStaff = useCallback(
+    (staffId: string, method: "raise" | "reduce_hours" | "bonus") => {
+      act({ type: "retain_staff", staffId, method });
+    },
+    [act],
+  );
 
   // ============ v2.8 产品专注度 ============
 
-  const setStaffFocusProduct = useCallback((staffId: string, productId: string | null) => {
-    act({ type: 'set_staff_focus_product', staffId, productId });
-  }, [act]);
+  const setStaffFocusProduct = useCallback(
+    (staffId: string, productId: string | null) => {
+      act({ type: "set_staff_focus_product", staffId, productId });
+    },
+    [act],
+  );
 
   // ============ v2.9 老板周行动 ============
 
-  const setBossAction = useCallback((action: BossActionType, role?: string, shopId?: string) => {
-    act({ type: 'set_boss_action', action, role, shopId });
-  }, [act]);
+  const setBossAction = useCallback(
+    (action: BossActionType, role?: string, shopId?: string) => {
+      act({ type: "set_boss_action", action, role, shopId });
+    },
+    [act],
+  );
 
   // ============ 出餐分配优先级 ============
 
-  const setSupplyPriority = useCallback((priority: SupplyPriority) => {
-    act({ type: 'set_supply_priority', priority });
-  }, [act]);
+  const setSupplyPriority = useCallback(
+    (priority: SupplyPriority) => {
+      act({ type: "set_supply_priority", priority });
+    },
+    [act],
+  );
 
   // ============ v2.9 交互式事件 ============
 
-  const respondToEvent = useCallback((eventId: string, optionId: string) => {
-    act({ type: 'respond_to_event', eventId, optionId });
-  }, [act]);
+  const respondToEvent = useCallback(
+    (eventId: string, optionId: string) => {
+      act({ type: "respond_to_event", eventId, optionId });
+    },
+    [act],
+  );
 
   // ============ 认知 & 周总结 ============
 
   const consultYongGe = useCallback(() => {
-    act({ type: 'consult_yong_ge' });
+    act({ type: "consult_yong_ge" });
   }, [act]);
 
   const clearWeeklySummary = useCallback(() => {
-    act({ type: 'clear_weekly_summary' });
+    act({ type: "clear_weekly_summary" });
   }, [act]);
 
   const clearLastWeekEvent = useCallback(() => {
-    act({ type: 'clear_last_week_event' });
+    act({ type: "clear_last_week_event" });
   }, [act]);
 
   // ============ 计算属性（委托给 gameQuery 纯函数） ============
 
   // 先算 supplyDemandResult，再传入 computeCurrentStats 避免重复计算
-  const supplyDemandResult = useMemo(() => computeSupplyDemandResult(gameState), [gameState]);
+  const supplyDemandResult = useMemo(
+    () => computeSupplyDemandResult(gameState),
+    [gameState],
+  );
 
   const currentStats = useMemo(
     () => computeCurrentStats(gameState, supplyDemandResult ?? undefined),
@@ -278,5 +462,12 @@ export function useGameState() {
     setSupplyPriority,
     // v2.9 交互式事件
     respondToEvent,
+    // Phase 1: 节奏控制
+    autoAdvance,
+    cancelAutoAdvance,
+    isAutoAdvancing: !!autoAdvanceRef.current,
+    speed: speedCtl.speed,
+    setSpeed: speedCtl.setSpeed,
+    cycleSpeed: speedCtl.cycleSpeed,
   };
 }

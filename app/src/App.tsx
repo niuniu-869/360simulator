@@ -20,6 +20,9 @@ import { WeeklySummaryDialog } from "@/components/WeeklySummaryDialog";
 import { EventDialog } from "@/components/EventDialog";
 import { CyberYongGe } from "@/components/CyberYongGe";
 import { CognitionLevelUpDialog } from "@/components/CognitionLevelUpDialog";
+import { Toaster } from "@/components/Toaster";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { pushToast } from "@/hooks/useToast";
 import type { Proposal } from "@/lib/llm/prompts";
 import type { CognitionLevel } from "@/types/game";
 import { diagnoseHealth } from "@/lib/healthCheck";
@@ -95,10 +98,18 @@ function App() {
     setSupplyPriority,
     // v2.9 交互式事件
     respondToEvent,
+    // Phase 1: 节奏控制
+    autoAdvance,
+    cancelAutoAdvance,
+    isAutoAdvancing,
+    speed,
+    setSpeed,
   } = useGameState();
 
   // 回顾弹窗状态
   const [showReview, setShowReview] = useState(false);
+  // Phase 1: 受控 Tab（用于全局快捷键 1/2/3/4 切换）
+  const [activeTab, setActiveTab] = useState<string>("operating");
   // 赛博勇哥面板状态
   const [showCyberYongGe, setShowCyberYongGe] = useState(false);
   // 欢迎页状态
@@ -118,6 +129,46 @@ function App() {
     gameState.gamePhase === "operating"
       ? diagnoseHealth(gameState, currentStats, supplyDemandResult)
       : [];
+
+  // Phase 1: 全局键盘快捷键
+  useGlobalShortcuts({
+    disabled: gameState.gamePhase !== "operating",
+    onEscape: () => {
+      // Esc 关顶层弹窗（按优先级）
+      if (showCyberYongGe) setShowCyberYongGe(false);
+      else if (showSeasonSelect) setShowSeasonSelect(false);
+      else if (showReview) setShowReview(false);
+      else if (pendingLevelUp) setPendingLevelUp(null);
+      else if (gameState.weeklySummary) clearWeeklySummary();
+      else if (gameState.lastWeekEvent) clearLastWeekEvent();
+    },
+    onSpace: () => {
+      // Space 推下一周（前提：无任何弹窗阻塞）
+      if (
+        gameState.pendingInteractiveEvent ||
+        gameState.weeklySummary ||
+        gameState.lastWeekEvent ||
+        gameState.gamePhase !== "operating"
+      ) {
+        return;
+      }
+      nextWeek();
+    },
+    onTab1: () => setActiveTab("operating"),
+    onTab2: () => setActiveTab("staff"),
+    onTab3: () => setActiveTab("inventory"),
+    onTab4: () => setActiveTab("marketing"),
+    onTab5: () => setActiveTab("finance"),
+    onTab6: () => setActiveTab("supplydemand"),
+    onHelp: () => {
+      pushToast({
+        message: "快捷键 / 节奏",
+        detail: "Esc 关弹窗 · Space 下一周 · 1-6 切 Tab · ? 帮助",
+        severity: "info",
+        durationMs: 5000,
+      });
+    },
+  });
 
   // hire_staff 延迟任务分配：React 批处理下 recruitStaff 后无法立即拿到新员工 ID，
   // 用 ref 暂存待分配岗位，useEffect 在 staff 变化后执行分配。
@@ -278,6 +329,7 @@ function App() {
 
   return (
     <>
+      <Toaster />
       {showWelcome ? (
         <WelcomePage onStart={() => setShowWelcome(false)} />
       ) : (
@@ -466,7 +518,11 @@ function App() {
                 </div>
 
                 {/* 主要操作标签页（渐进式解锁） */}
-                <Tabs defaultValue="operating" className="w-full">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
+                >
                   <TabsList className="w-full flex bg-[#151d2b] border border-[#1e293b] overflow-x-auto">
                     {/* 已解锁的Tab */}
                     {isPanelUnlocked(
@@ -610,6 +666,11 @@ function App() {
                       supplyDemandResult={supplyDemandResult ?? undefined}
                       onSetBossAction={setBossAction}
                       onSetSupplyPriority={setSupplyPriority}
+                      speed={speed}
+                      onSetSpeed={setSpeed}
+                      onAutoAdvance={autoAdvance}
+                      onCancelAutoAdvance={cancelAutoAdvance}
+                      isAutoAdvancing={isAutoAdvancing}
                     />
                   </TabsContent>
 
