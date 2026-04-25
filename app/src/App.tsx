@@ -49,6 +49,21 @@ import {
   Lock,
 } from "lucide-react";
 
+// Phase 4: 解析 URL ?seed=N 参数（仅在初次加载时执行一次）
+function readSeedFromUrl(): number | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("seed");
+    if (!raw) return undefined;
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
 function App() {
   const {
     gameState,
@@ -104,7 +119,7 @@ function App() {
     isAutoAdvancing,
     speed,
     setSpeed,
-  } = useGameState();
+  } = useGameState({ seed: readSeedFromUrl() });
 
   // Phase 2: 关键事件响应后立即吐 toast（可见决策反馈）
   const respondToEvent = useCallback(

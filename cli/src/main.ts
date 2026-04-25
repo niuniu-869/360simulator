@@ -3,13 +3,28 @@
  *
  * JSON-lines over stdin/stdout，每行一个 JSON 对象。
  * Agent 通过 stdin 发送请求，通过 stdout 接收响应。
+ *
+ * Phase 4：支持启动参数 --seed=N 和 --scenario=ID
+ *   - --seed=42        以指定 seed 初始化（可复现）
+ *   - --scenario=scen_zhinanguozhi  应用剧本预设（脚盆果汁）
  */
 
-import * as readline from 'node:readline';
-import { GameRunner } from './gameRunner';
-import type { AgentRequest } from './protocol';
+import * as readline from "node:readline";
+import { GameRunner } from "./gameRunner";
+import type { AgentRequest } from "./protocol";
 
-const runner = new GameRunner();
+// 解析 CLI 启动参数
+const argv = process.argv.slice(2);
+let seed: number | undefined;
+let scenarioId: string | undefined;
+for (const arg of argv) {
+  const m = /^--seed=(-?\d+)$/.exec(arg);
+  if (m) seed = Number(m[1]);
+  const m2 = /^--scenario=([\w_-]+)$/.exec(arg);
+  if (m2) scenarioId = m2[1];
+}
+
+const runner = new GameRunner({ seed, scenarioId });
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -19,10 +34,10 @@ const rl = readline.createInterface({
 
 /** 向 stdout 写入一行 JSON */
 function send(obj: unknown): void {
-  process.stdout.write(JSON.stringify(obj) + '\n');
+  process.stdout.write(JSON.stringify(obj) + "\n");
 }
 
-rl.on('line', (line: string) => {
+rl.on("line", (line: string) => {
   const trimmed = line.trim();
   if (!trimmed) return; // 跳过空行
 
@@ -30,13 +45,13 @@ rl.on('line', (line: string) => {
   try {
     req = JSON.parse(trimmed);
   } catch {
-    send({ id: null, success: false, error: 'Invalid JSON' });
+    send({ id: null, success: false, error: "Invalid JSON" });
     return;
   }
 
   // 基本校验
-  if (!req || typeof req !== 'object' || !req.id || !req.type) {
-    send({ id: req?.id ?? null, success: false, error: 'Missing required fields: id, type' });
+  if (!req || typeof req !== "object" || !req.id || !req.type) {
+    send({ id: req?.id ?? null, success: false, error: "Missing required fields: id, type" });
     return;
   }
 
@@ -44,6 +59,6 @@ rl.on('line', (line: string) => {
   send(resp);
 });
 
-rl.on('close', () => {
+rl.on("close", () => {
   process.exit(0);
 });

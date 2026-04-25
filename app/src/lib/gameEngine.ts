@@ -82,6 +82,7 @@ import {
 import type { InvestigationDimension } from "@/types/game";
 import { seedRng, rand } from "@/lib/rng";
 import { tickDrama } from "@/lib/dramaEngine";
+import { evaluateAchievements } from "@/lib/achievements";
 
 // ============ 常量 ============
 
@@ -2076,7 +2077,20 @@ export function weeklyTick(prev: GameState): {
   };
 
   // Phase 3: 戏剧性 — 检测危机模式 / 强制 / 翻盘 / 高光事件
-  const finalState = tickDrama(newState);
+  const dramaState = tickDrama(newState);
+
+  // Phase 4: 成就检测（增量）
+  const newlyUnlocked = evaluateAchievements(dramaState);
+  const finalState: GameState =
+    newlyUnlocked.length > 0
+      ? {
+          ...dramaState,
+          unlockedAchievements: [
+            ...(dramaState.unlockedAchievements ?? []),
+            ...newlyUnlocked,
+          ],
+        }
+      : dramaState;
 
   return { state: finalState, summary: weeklySummary };
 }

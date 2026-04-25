@@ -43,13 +43,26 @@ import {
   MIXED_ACTIVITIES,
 } from "@/data/marketingData";
 import { TimelineCollector } from "./timeline";
+import { applyScenarioToInitialState, SCENARIO_BY_ID } from "@/data/scenarios";
+
+export interface GameRunnerOpts {
+  seed?: number;
+  scenarioId?: string;
+}
 
 export class GameRunner {
   private state: GameState;
   private timeline: TimelineCollector;
+  private scenarioId: string | null;
 
-  constructor() {
-    this.state = createInitialGameState();
+  constructor(opts: GameRunnerOpts = {}) {
+    this.state = createInitialGameState(opts.seed);
+    if (opts.scenarioId && SCENARIO_BY_ID[opts.scenarioId]) {
+      this.state = applyScenarioToInitialState(this.state, opts.scenarioId);
+      this.scenarioId = opts.scenarioId;
+    } else {
+      this.scenarioId = null;
+    }
     this.timeline = new TimelineCollector();
   }
 
@@ -380,13 +393,19 @@ export class GameRunner {
     if (typeof meta === "object" && meta && "reset" in meta) {
       const opts = meta.reset;
       this.state = createInitialGameState(opts?.seed);
+      if (opts?.scenarioId && SCENARIO_BY_ID[opts.scenarioId]) {
+        this.state = applyScenarioToInitialState(this.state, opts.scenarioId);
+        this.scenarioId = opts.scenarioId;
+      } else {
+        this.scenarioId = null;
+      }
       this.timeline.reset();
       return {
         id,
         success: true,
         data: {
           ...serializeState(this.state),
-          scenarioId: opts?.scenarioId ?? null,
+          scenarioId: this.scenarioId,
         },
       };
     }
