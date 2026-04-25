@@ -1,0 +1,28 @@
+{
+  "phase": 5,
+  "timestamp": "2026-04-25T11:25:52.475Z",
+  "metrics": {
+    "bundleOk": true,
+    "bundleJsKB": 1381,
+    "bundleTotalKB": 1508,
+    "gzipOk": true,
+    "mainGzipKb": 394.9,
+    "clickDepth": 2,
+    "clickMs": 12
+  },
+  "expected": {},
+  "evalDetail": {
+    "bundleOk": {
+      "actual": true,
+      "pass": true
+    },
+    "gzipOk": {
+      "actual": true,
+      "pass": true
+    },
+    "clickDepthOk": {
+      "pass": true
+    }
+  },
+  "pass": true
+}

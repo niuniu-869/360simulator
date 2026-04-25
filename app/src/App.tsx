@@ -23,6 +23,9 @@ import { CognitionLevelUpDialog } from "@/components/CognitionLevelUpDialog";
 import { Toaster } from "@/components/Toaster";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { pushToast } from "@/hooks/useToast";
+import { TodaysTaskBar } from "@/components/TodaysTaskBar";
+import { MiniSparkline } from "@/components/MiniSparkline";
+import { CommandPalette } from "@/components/CommandPalette";
 import type { Proposal } from "@/lib/llm/prompts";
 import type { CognitionLevel } from "@/types/game";
 import { diagnoseHealth } from "@/lib/healthCheck";
@@ -435,6 +438,42 @@ function App() {
             cognitionLevel={gameState.cognition.level}
             currentStats={currentStats}
             onOpenCyberYongGe={() => setShowCyberYongGe(true)}
+          />
+
+          {/* Phase 5: 今日待办栏 */}
+          <TodaysTaskBar gameState={gameState} onJumpTab={setActiveTab} />
+
+          {/* Phase 5: 8 周趋势小图（毛利率 / 口碑 / 曝光） */}
+          {gameState.gamePhase === "operating" &&
+            gameState.profitHistory.length > 0 && (
+              <div className="max-w-7xl mx-auto px-4 pt-3 flex flex-wrap gap-2">
+                <MiniSparkline
+                  label="周利润"
+                  data={gameState.profitHistory.slice(-8)}
+                  color="#34d399"
+                  formatValue={(v) => `¥${Math.round(v).toLocaleString()}`}
+                />
+                <MiniSparkline
+                  label="周营收"
+                  data={gameState.revenueHistory.slice(-8)}
+                  color="#fb923c"
+                  formatValue={(v) => `¥${Math.round(v).toLocaleString()}`}
+                />
+                <MiniSparkline
+                  label="现金"
+                  data={gameState.cashHistory.slice(-8)}
+                  color="#60a5fa"
+                  formatValue={(v) => `¥${Math.round(v).toLocaleString()}`}
+                />
+              </div>
+            )}
+
+          {/* Phase 5: Cmd+K 全局搜索 */}
+          <CommandPalette
+            gameState={gameState}
+            onJumpTab={setActiveTab}
+            onNextWeek={nextWeek}
+            onAutoAdvance={autoAdvance}
           />
 
           <main className="max-w-7xl mx-auto px-4 py-6">
