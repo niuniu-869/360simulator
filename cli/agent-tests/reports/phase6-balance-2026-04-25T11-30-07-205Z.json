@@ -1,0 +1,568 @@
+{
+  "phase": 6,
+  "timestamp": "2026-04-25T11:30:07.205Z",
+  "seeds": [
+    100,
+    107,
+    114,
+    121,
+    128,
+    135,
+    142,
+    149,
+    156,
+    163
+  ],
+  "runsPerStrategy": 10,
+  "summary": [
+    {
+      "name": "conservative",
+      "runs": 10,
+      "wins": 0,
+      "winRate": 0,
+      "avgWeeks": 52,
+      "avgProfit": -96611,
+      "bankrupt": 0
+    },
+    {
+      "name": "aggressive",
+      "runs": 10,
+      "wins": 0,
+      "winRate": 0,
+      "avgWeeks": 38,
+      "avgProfit": -135270,
+      "bankrupt": 10
+    },
+    {
+      "name": "balanced",
+      "runs": 10,
+      "wins": 0,
+      "winRate": 0,
+      "avgWeeks": 52,
+      "avgProfit": -85914,
+      "bankrupt": 0
+    },
+    {
+      "name": "delivery",
+      "runs": 10,
+      "wins": 0,
+      "winRate": 0,
+      "avgWeeks": 36,
+      "avgProfit": -104244,
+      "bankrupt": 10
+    },
+    {
+      "name": "dine_in",
+      "runs": 10,
+      "wins": 0,
+      "winRate": 0,
+      "avgWeeks": 52,
+      "avgProfit": -49243,
+      "bankrupt": 0
+    }
+  ],
+  "overallAvgWeeks": 46,
+  "pass": true,
+  "allResults": [
+    {
+      "strategy": "conservative",
+      "seed": 100,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -141621,
+      "cash": 137964,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 107,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -95021,
+      "cash": 109543,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 114,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -106456,
+      "cash": 69568,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 121,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -110979,
+      "cash": 85006,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 128,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -98675,
+      "cash": 97199,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 135,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -110727,
+      "cash": 126766,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 142,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -98343,
+      "cash": 159812,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 149,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -78887,
+      "cash": 137426,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 156,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -44920,
+      "cash": 140077,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "conservative",
+      "seed": 163,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -80482,
+      "cash": 108552,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 100,
+      "end": "bankrupt",
+      "weeks": 35,
+      "profit": -146928,
+      "cash": -5293,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 107,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -151306,
+      "cash": -8385,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 114,
+      "end": "bankrupt",
+      "weeks": 39,
+      "profit": -126400,
+      "cash": -13453,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 121,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -136949,
+      "cash": -6123,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 128,
+      "end": "bankrupt",
+      "weeks": 39,
+      "profit": -132265,
+      "cash": -5287,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 135,
+      "end": "bankrupt",
+      "weeks": 38,
+      "profit": -164305,
+      "cash": -7822,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 142,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -99837,
+      "cash": -7547,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 149,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -181161,
+      "cash": -7724,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 156,
+      "end": "bankrupt",
+      "weeks": 40,
+      "profit": -131054,
+      "cash": -9771,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "aggressive",
+      "seed": 163,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -82497,
+      "cash": -7802,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "balanced",
+      "seed": 100,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -109747,
+      "cash": 149287,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 107,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -78590,
+      "cash": 145197,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 114,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -70522,
+      "cash": 156531,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 121,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -61456,
+      "cash": 152896,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 128,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -92059,
+      "cash": 104176,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 135,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -95991,
+      "cash": 109084,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 142,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -103607,
+      "cash": 137161,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 149,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -76012,
+      "cash": 150572,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 156,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -63283,
+      "cash": 147720,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "balanced",
+      "seed": 163,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -107873,
+      "cash": 112371,
+      "win": false,
+      "setupOk": false
+    },
+    {
+      "strategy": "delivery",
+      "seed": 100,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -64810,
+      "cash": -6190,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 107,
+      "end": "bankrupt",
+      "weeks": 40,
+      "profit": -165302,
+      "cash": -11894,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 114,
+      "end": "bankrupt",
+      "weeks": 32,
+      "profit": -49893,
+      "cash": -7776,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 121,
+      "end": "bankrupt",
+      "weeks": 35,
+      "profit": -64895,
+      "cash": -12812,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 128,
+      "end": "bankrupt",
+      "weeks": 36,
+      "profit": -80499,
+      "cash": -5153,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 135,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -153388,
+      "cash": -9240,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 142,
+      "end": "bankrupt",
+      "weeks": 44,
+      "profit": -119685,
+      "cash": -8302,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 149,
+      "end": "bankrupt",
+      "weeks": 38,
+      "profit": -138684,
+      "cash": -9845,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 156,
+      "end": "bankrupt",
+      "weeks": 37,
+      "profit": -72143,
+      "cash": -9658,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "delivery",
+      "seed": 163,
+      "end": "bankrupt",
+      "weeks": 27,
+      "profit": -133141,
+      "cash": -22878,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 100,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -46396,
+      "cash": 53638,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 107,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -64610,
+      "cash": 35963,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 114,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -62737,
+      "cash": 119891,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 121,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -78477,
+      "cash": 60033,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 128,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": 16306,
+      "cash": 74491,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 135,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -27409,
+      "cash": 52404,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 142,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -28874,
+      "cash": 58469,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 149,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -53519,
+      "cash": 53528,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 156,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -59257,
+      "cash": 54780,
+      "win": false,
+      "setupOk": true
+    },
+    {
+      "strategy": "dine_in",
+      "seed": 163,
+      "end": "time_limit",
+      "weeks": 52,
+      "profit": -87453,
+      "cash": 48192,
+      "win": false,
+      "setupOk": true
+    }
+  ]
+}
