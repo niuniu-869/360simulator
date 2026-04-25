@@ -97,7 +97,7 @@ function App() {
     // 出餐分配优先级
     setSupplyPriority,
     // v2.9 交互式事件
-    respondToEvent,
+    respondToEvent: rawRespondToEvent,
     // Phase 1: 节奏控制
     autoAdvance,
     cancelAutoAdvance,
@@ -105,6 +105,23 @@ function App() {
     speed,
     setSpeed,
   } = useGameState();
+
+  // Phase 2: 关键事件响应后立即吐 toast（可见决策反馈）
+  const respondToEvent = useCallback(
+    (eventId: string, optionId: string) => {
+      const ev = gameState.pendingInteractiveEvent;
+      const opt = ev?.options?.find((o) => o.id === optionId);
+      const optText =
+        opt?.text || (optionId === "__notification__" ? "知道了" : optionId);
+      rawRespondToEvent(eventId, optionId);
+      pushToast({
+        message: `事件已响应：${ev?.name ?? eventId}`,
+        detail: `选择：${optText}`,
+        severity: "info",
+      });
+    },
+    [gameState.pendingInteractiveEvent, rawRespondToEvent],
+  );
 
   // 回顾弹窗状态
   const [showReview, setShowReview] = useState(false);
@@ -129,6 +146,70 @@ function App() {
     gameState.gamePhase === "operating"
       ? diagnoseHealth(gameState, currentStats, supplyDemandResult)
       : [];
+
+  // Phase 2: 状态侧效 toast — 员工离职 / 现金告急 / 升级
+  const lastStaffNamesRef = useRef<Set<string>>(
+    new Set(gameState.staff.map((s) => s.id)),
+  );
+  const lastCashAlertRef = useRef<boolean>(false);
+  const lastWeekRef = useRef<number>(gameState.currentWeek);
+
+  useEffect(() => {
+    // 员工离职检测（id 减少）
+    const curIds = new Set(gameState.staff.map((s) => s.id));
+    const prev = lastStaffNamesRef.current;
+    if (prev.size > curIds.size) {
+      const left = [...prev].filter((id) => !curIds.has(id));
+      const lostNames = gameState.weeklySummary?.quitStaffNames || [];
+      pushToast({
+        message:
+          lostNames.length > 0
+            ? `员工离职：${lostNames.join("、")}`
+            : "有员工离开了",
+        detail: `当前员工 ${gameState.staff.length} 人（流失 ${left.length} 人）`,
+        severity: "warning",
+      });
+    }
+    lastStaffNamesRef.current = curIds;
+
+    // 现金告警（< 1 周固定成本）
+    const fixed = gameState.weeklyFixedCost || 1;
+    const lowCash =
+      gameState.cash < fixed && gameState.gamePhase === "operating";
+    if (lowCash && !lastCashAlertRef.current) {
+      pushToast({
+        message: "⚠️ 现金告急",
+        detail: `余额 ¥${Math.round(gameState.cash)} < 一周固定成本 ¥${Math.round(fixed)}`,
+        severity: "danger",
+        durationMs: 5000,
+      });
+    }
+    lastCashAlertRef.current = lowCash;
+
+    // 周变化检测：吐周报摘要 toast
+    if (
+      gameState.currentWeek !== lastWeekRef.current &&
+      gameState.lastWeeklySummary
+    ) {
+      const sum = gameState.lastWeeklySummary;
+      const sign = sum.profit >= 0 ? "+" : "";
+      pushToast({
+        message: `第 ${sum.week} 周结束：${sign}¥${Math.round(sum.profit).toLocaleString()}`,
+        detail: `营收 ¥${Math.round(sum.revenue).toLocaleString()} · 满足率 ${(sum.fulfillmentRate * 100).toFixed(0)}%`,
+        severity: sum.profit >= 0 ? "success" : "warning",
+        durationMs: 2500,
+      });
+    }
+    lastWeekRef.current = gameState.currentWeek;
+  }, [
+    gameState.staff,
+    gameState.cash,
+    gameState.weeklyFixedCost,
+    gameState.gamePhase,
+    gameState.currentWeek,
+    gameState.lastWeeklySummary,
+    gameState.weeklySummary,
+  ]);
 
   // Phase 1: 全局键盘快捷键
   useGlobalShortcuts({

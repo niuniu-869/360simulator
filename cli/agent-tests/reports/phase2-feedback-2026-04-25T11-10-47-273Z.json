@@ -1,0 +1,87 @@
+{
+  "phase": 2,
+  "timestamp": "2026-04-25T11:10:47.273Z",
+  "seed": 100,
+  "metrics": {
+    "wallClockMs": 60,
+    "weeksCompleted": 0,
+    "bankruptWeek": null,
+    "endReason": null,
+    "actionsCount": 39,
+    "eventsTriggered": 0,
+    "eventsResponded": 0,
+    "weeksPerSec": 0,
+    "clicksPerWeek": 0,
+    "dramaMoments": 0,
+    "dramaByType": {
+      "crisis": 0,
+      "highlight": 0,
+      "turning_point": 0,
+      "bankruptcy_threat": 0
+    },
+    "toastsTotal": 0,
+    "popupChainSamples": [],
+    "transparencyScore": 10,
+    "priceOk": true,
+    "marketingOk": true,
+    "bossOk": true,
+    "timelineEvents": 9
+  },
+  "expected": {
+    "transparencyScore": ">=8",
+    "timelineEvents": ">=1"
+  },
+  "evalDetail": {
+    "transparencyScore": {
+      "actual": 10,
+      "expected": ">=8",
+      "pass": true
+    },
+    "priceOk": {
+      "actual": true,
+      "pass": true
+    },
+    "marketingOk": {
+      "actual": true,
+      "pass": true
+    },
+    "bossOk": {
+      "actual": true,
+      "pass": true
+    },
+    "timelineEvents": {
+      "actual": 9,
+      "expected": ">=1",
+      "pass": true
+    }
+  },
+  "samples": {
+    "pricePrediction": {
+      "productId": "milktea",
+      "oldPrice": 12,
+      "newPrice": 14.399999999999999,
+      "currentDemand": 9,
+      "predictedDemand": 8,
+      "deltaRevenue": 7,
+      "deltaProfit": 12,
+      "breakEvenSales": 5,
+      "warnings": []
+    },
+    "marketingPrediction": {
+      "activityId": "social_media",
+      "weeklyCost": 2000,
+      "estExposureGain": 15,
+      "estReputationGain": 0,
+      "estROI": -0.55,
+      "weeksToBreakEven": 3,
+      "notes": [
+        "当前预测 ROI 为负，建议先提升基础流量"
+      ]
+    },
+    "bossPrediction": {
+      "actionId": "investigate_nearby",
+      "hint": "详见 BOSS_ACTION_HINTS（Phase 2 完整化）"
+    }
+  },
+  "pass": true
+}
