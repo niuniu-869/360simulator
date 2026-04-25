@@ -98,17 +98,19 @@ export const DRAMA_EVENTS: InteractiveGameEvent[] = [
         id: "accept_chain",
         text: "挂牌：稳定供货 + 现成流量",
         yonggeQuote: "换了招牌就不是你自己的店了。但稳。",
+        // Phase 6 校准：原 +5000 + cost_multiplier 1.05×12w（净 -1k 陷阱）
+        // 改为：现金更多 + 短期 demand_boost（合理激励）
         effects: {
-          cash: 5000,
+          cash: 8000,
           exposure: 10,
           reputation: -2,
           cognitionExp: 60,
           buffs: [
             {
-              type: "cost_multiplier",
-              value: 1.05,
-              durationWeeks: 12,
-              source: "franchise_fee",
+              type: "demand_boost",
+              value: 0.08,
+              durationWeeks: 8,
+              source: "chain_traffic",
             },
           ],
         },

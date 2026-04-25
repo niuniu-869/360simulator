@@ -83,13 +83,19 @@ import type { InvestigationDimension } from "@/types/game";
 import { seedRng, rand } from "@/lib/rng";
 import { tickDrama } from "@/lib/dramaEngine";
 import { evaluateAchievements } from "@/lib/achievements";
+import {
+  CLEANLINESS_BASE_DIRT,
+  CLEANLINESS_REPUTATION_IMPACT,
+} from "@/data/balance";
 
 // ============ 常量 ============
 
 export const INITIAL_CASH = 400000; // 初始资金40万（原30万，给加盟品牌留足运营缓冲）
-export const WIN_STREAK = 6; // 连续盈利6周即胜利
-export const WIN_EXPOSURE = 35;
-export const WIN_REPUTATION = 55;
+export const WIN_STREAK = 6; // 连续盈利6周即胜利（≈ 1.5 个月稳态盈利，对小店合理）
+// Phase 6 校准：原 35/55，对学校/社区小店过苛（街知巷闻+口碑双高 → 网红级）
+// 现实"成功小店"= exposure 25-30（街区知名）+ reputation 45-55（口碑稳定）
+export const WIN_EXPOSURE = 30;
+export const WIN_REPUTATION = 45;
 export const MIN_OPERATING_CASH = -5000; // 允许小额透支缓冲（基础下限，筹备阶段用）
 
 /**
@@ -631,10 +637,12 @@ export function weeklyTick(prev: GameState): {
   );
   campaignPulse *= 0.58;
 
-  // 口碑自然回归（比旧版更强），防止长期无成本维持高分
+  // 口碑自然回归（防止长期无成本维持高分）
+  // Phase 6 校准：原 -0.35/周（年度 -18 分过激），改为 -0.20/周（年度 -10 分）
+  // 真实小店若不出问题，口碑年内只会缓慢均值回归
   newReputation = Math.max(
     DEPENDENCY_CONFIG.reputationFloor,
-    newReputation - 0.35,
+    newReputation - 0.2,
   );
 
   let campaignPulseGain = 0;
@@ -1036,10 +1044,14 @@ export function weeklyTick(prev: GameState): {
   }
 
   // 整洁度影响口碑（与服务质量并列）
+  // Phase 6 校准：原 -0.8/-1.8 过激（< 40 后 30 周累计 -24），改为 -0.4/-1.0
   const currentCleanliness = prevWithEffects.cleanliness ?? 60;
-  if (currentCleanliness >= 80) reputationDelta += 0.35;
-  if (currentCleanliness < 40) reputationDelta -= 0.8;
-  if (currentCleanliness < 20) reputationDelta -= 1.8;
+  if (currentCleanliness >= 80)
+    reputationDelta += CLEANLINESS_REPUTATION_IMPACT.highBonus;
+  if (currentCleanliness < 40)
+    reputationDelta += CLEANLINESS_REPUTATION_IMPACT.lowPenalty;
+  if (currentCleanliness < 20)
+    reputationDelta += CLEANLINESS_REPUTATION_IMPACT.veryLowPenalty;
 
   // 置信度调制 + 高分段饱和抑制（避免轻易双100）
   const confidenceFactor = 0.35 + trustConfidence * 0.65;
@@ -1472,7 +1484,7 @@ export function weeklyTick(prev: GameState): {
   const WAITER_CLEAN_RATE = 2.5; // 服务员清洁贡献
   const WAITER_BUSY_THRESHOLD = 0.7; // 忙碌阈值
   const WAITER_BUSY_PENALTY = 0.5; // 忙碌惩罚系数
-  const BASE_DIRT = 2.0; // 基础脏度
+  const BASE_DIRT = CLEANLINESS_BASE_DIRT; // Phase 6 校准：2.0 → 1.2（小店更友好）
   const AREA_DIRT_FACTOR = 50; // 面积因子（每50㎡+1点）
   const SALES_DIRT_FACTOR = 300; // 销售因子（每300份+1点）
 

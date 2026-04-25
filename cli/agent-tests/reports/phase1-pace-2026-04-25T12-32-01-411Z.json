@@ -1,0 +1,63 @@
+{
+  "phase": 1,
+  "timestamp": "2026-04-25T12:32:01.410Z",
+  "seed": 42,
+  "targetWeeks": 52,
+  "metrics": {
+    "wallClockMs": 904,
+    "weeksCompleted": 52,
+    "bankruptWeek": null,
+    "endReason": "time_limit",
+    "actionsCount": 33,
+    "eventsTriggered": 16,
+    "eventsResponded": 16,
+    "weeksPerSec": 611.76,
+    "clicksPerWeek": 0.63,
+    "dramaMoments": 9,
+    "dramaByType": {
+      "crisis": 1,
+      "highlight": 7,
+      "turning_point": 1,
+      "bankruptcy_threat": 0
+    },
+    "toastsTotal": 0,
+    "popupChainSamples": [],
+    "popupChainMaxMs": 12,
+    "popupSamples": [
+      12,
+      2
+    ],
+    "advancedWeeks": 52,
+    "autoAdvanceWallMs": 85,
+    "finalWeek": 52,
+    "finalCash": 285032,
+    "finalCumulativeProfit": 52580
+  },
+  "expected": {
+    "weeksPerSec": ">=2.0",
+    "clicksPerWeek": "<=1.5",
+    "popupChainMaxMs": "<=200"
+  },
+  "evalDetail": {
+    "weeksPerSec": {
+      "actual": 611.76,
+      "expected": ">=2.0",
+      "pass": true
+    },
+    "clicksPerWeek": {
+      "actual": 0.63,
+      "expected": "<=1.5",
+      "pass": true
+    },
+    "popupChainMaxMs": {
+      "actual": 12,
+      "expected": "<=200",
+      "pass": true
+    }
+  },
+  "improvement": {
+    "clicks_pct": 73
+  },
+  "pass": true,
+  "duration_ms": 85
+}

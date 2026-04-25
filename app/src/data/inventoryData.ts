@@ -7,23 +7,22 @@ import type {
   StockoutEffect,
 } from "@/types/game";
 import { rand } from "@/lib/rng";
+import {
+  HOLDING_COST_RATES_CALIBRATED,
+  WASTE_RATES_CALIBRATED,
+} from "@/data/balance";
 
 // ============ 损耗率配置 ============
 // 直接按存储方式分类，不再按原料品类（消除与产品 category 的映射断裂）
 
-export const WASTE_RATES: Record<StorageType, number> = {
-  normal: 0.05, // 常温：5%/周
-  refrigerated: 0.08, // 冷藏：8%/周
-  frozen: 0.03, // 冷冻：3%/周
-};
+// 损耗率（Phase 6 校准：见 balance.ts WASTE_RATES_CALIBRATED）
+export const WASTE_RATES: Record<StorageType, number> = WASTE_RATES_CALIBRATED;
 
 // ============ 持有成本配置 ============
-
-export const HOLDING_COST_RATES: Record<StorageType, number> = {
-  normal: 0.02, // 常温：2%/周
-  refrigerated: 0.05, // 冷藏：5%/周（含电费）
-  frozen: 0.07, // 冷冻：7%/周（含电费）
-};
+// Phase 6 校准：原值过高 50-100%，对标真实小型超商冷链含电费 1-3%/周
+// 详见 balance.ts HOLDING_COST_RATES_CALIBRATED
+export const HOLDING_COST_RATES: Record<StorageType, number> =
+  HOLDING_COST_RATES_CALIBRATED;
 
 // ============ 缺货效果配置 ============
 // 按满足率分级，影响销量和口碑

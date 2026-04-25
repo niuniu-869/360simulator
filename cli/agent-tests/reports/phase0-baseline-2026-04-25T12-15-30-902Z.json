@@ -1,0 +1,62 @@
+{
+  "phase": 0,
+  "timestamp": "2026-04-25T12:15:30.902Z",
+  "seed": 42,
+  "metrics": {
+    "wallClockMs": 121,
+    "weeksCompleted": 51,
+    "bankruptWeek": null,
+    "endReason": "time_limit",
+    "actionsCount": 132,
+    "eventsTriggered": 20,
+    "eventsResponded": 20,
+    "weeksPerSec": 421.49,
+    "clicksPerWeek": 2.59,
+    "dramaMoments": 8,
+    "dramaByType": {
+      "crisis": 4,
+      "highlight": 1,
+      "turning_point": 3,
+      "bankruptcy_threat": 0
+    },
+    "toastsTotal": 0,
+    "popupChainSamples": []
+  },
+  "deterministic": {
+    "reproducible": true,
+    "cash": {
+      "run1": 208407,
+      "run2": 208407,
+      "equal": true
+    },
+    "cumulativeProfit": {
+      "run1": -25568,
+      "run2": -25568,
+      "equal": true
+    },
+    "week": {
+      "run1": 52,
+      "run2": 52,
+      "equal": true
+    },
+    "timelineLen": {
+      "run1": 52,
+      "run2": 52,
+      "equal": true
+    }
+  },
+  "timelineLength": 52,
+  "timelineNonEmpty": true,
+  "expected": {
+    "weeksCompleted": ">=10"
+  },
+  "evalDetail": {
+    "weeksCompleted": {
+      "actual": 51,
+      "expected": ">=10",
+      "pass": true
+    }
+  },
+  "pass": true,
+  "duration_ms": 267
+}

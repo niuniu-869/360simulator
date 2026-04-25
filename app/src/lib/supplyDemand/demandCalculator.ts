@@ -143,8 +143,10 @@ export function calculateAbsolutePriceEffect(
 
 // 价格弹性系数：不同客群对价格的敏感度
 // 值越大，价格变动对需求的影响越大
+// Phase 6 校准：学生 1.3 → 0.9（现实学生对 ¥1-2 差价不敏感，零食习惯化）
+import { STUDENT_PRICE_ELASTICITY } from "@/data/balance";
 const PRICE_ELASTICITY: Record<CustomerType, number> = {
-  students: 1.3, // 学生最敏感（从1.5降至1.3，缓解学校选址地狱难度）
+  students: STUDENT_PRICE_ELASTICITY, // 1.3 → 0.9（见 balance.ts）
   office: 0.8, // 上班族中等偏低
   family: 1.0, // 家庭中等
   tourist: 0.5, // 游客最不敏感

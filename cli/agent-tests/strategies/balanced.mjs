@@ -9,7 +9,7 @@ export const balancedStrategy = {
   setup: {
     brandId: 'independent',
     locationId: 'community',
-    addressId: 'community_main',
+    addressId: 'community_entrance',
     decorationId: 'simple',
     products: ['milktea', 'fruittea', 'fries'],
     staffTypes: ['fulltime', 'parttime'],

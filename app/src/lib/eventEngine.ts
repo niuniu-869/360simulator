@@ -24,6 +24,7 @@ import type {
 import { INTERACTIVE_EVENTS } from "@/data/interactiveEvents";
 import { applyCognitionExp } from "@/data/cognitionData";
 import { rand } from "@/lib/rng";
+import { EVENT_PROBABILITY_BOOST } from "@/data/balance";
 
 // ============ 上下文判定函数映射 ============
 
@@ -197,13 +198,13 @@ export function rollInteractiveEvent(
 
   // 按概率加权抽取（每个候选独立掷骰，取第一个命中的）
   // 打乱顺序避免固定优先级
-  // Phase 3: 概率 × 1.5（提升戏剧密度），同事件 8 周冷却（已通过 history 实现）
-  const PROBABILITY_BOOST = 1.5;
+  // Phase 3 引入 ×1.5；Phase 6 校准回 ×EVENT_PROBABILITY_BOOST(1.10)
+  // 详见 data/balance.ts — 1.5 把惩罚类老事件 ×1.5 导致系统性亏损
   const shuffled = candidates.sort(() => rand() - 0.5);
   for (const event of shuffled) {
     const p = Math.min(
       0.95,
-      event.triggerCondition.probability * PROBABILITY_BOOST,
+      event.triggerCondition.probability * EVENT_PROBABILITY_BOOST,
     );
     if (rand() < p) {
       return event;

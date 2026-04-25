@@ -1,0 +1,83 @@
+{
+  "phase": 4,
+  "timestamp": "2026-04-25T12:32:15.791Z",
+  "seed": 1234,
+  "metrics": {
+    "reproducible": true,
+    "unlockedCount": 20,
+    "cliArgsOk": true,
+    "scenArgsOk": true,
+    "allScenariosOk": true,
+    "scenarioResults": [
+      {
+        "ok": true,
+        "scenarioId": "scen_zhinanguozhi",
+        "advanced": 3,
+        "finalPhase": "operating",
+        "finalCash": 354113
+      },
+      {
+        "ok": true,
+        "scenarioId": "scen_baiwanshenglou",
+        "advanced": 3,
+        "finalPhase": "operating",
+        "finalCash": 354113
+      },
+      {
+        "ok": true,
+        "scenarioId": "scen_zhongyao",
+        "advanced": 3,
+        "finalPhase": "operating",
+        "finalCash": 354113
+      },
+      {
+        "ok": true,
+        "scenarioId": "scen_shanlu",
+        "advanced": 3,
+        "finalPhase": "operating",
+        "finalCash": 354113
+      },
+      {
+        "ok": true,
+        "scenarioId": "scen_kuaizhao",
+        "advanced": 3,
+        "finalPhase": "operating",
+        "finalCash": 354113
+      },
+      {
+        "ok": true,
+        "scenarioId": "scen_aixiage",
+        "advanced": 3,
+        "finalPhase": "operating",
+        "finalCash": 354113
+      }
+    ]
+  },
+  "expected": {
+    "unlockedCount": ">=10"
+  },
+  "evalDetail": {
+    "reproducible": {
+      "actual": true,
+      "pass": true
+    },
+    "unlockedCount": {
+      "actual": 20,
+      "expected": ">=10",
+      "pass": true
+    },
+    "cliArgsOk": {
+      "actual": true,
+      "pass": true
+    },
+    "scenArgsOk": {
+      "actual": true,
+      "pass": true
+    },
+    "allScenariosOk": {
+      "actual": true,
+      "pass": true
+    }
+  },
+  "pass": true
+}
