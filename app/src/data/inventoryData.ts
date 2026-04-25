@@ -1,45 +1,113 @@
 // 库存系统数据配置（v2.1 重构）
 
-import type { StorageType, RestockStrategy, RestockStrategyConfig, StockoutEffect } from '@/types/game';
+import type {
+  StorageType,
+  RestockStrategy,
+  RestockStrategyConfig,
+  StockoutEffect,
+} from "@/types/game";
+import { rand } from "@/lib/rng";
 
 // ============ 损耗率配置 ============
 // 直接按存储方式分类，不再按原料品类（消除与产品 category 的映射断裂）
 
 export const WASTE_RATES: Record<StorageType, number> = {
-  normal: 0.05,        // 常温：5%/周
-  refrigerated: 0.08,  // 冷藏：8%/周
-  frozen: 0.03,        // 冷冻：3%/周
+  normal: 0.05, // 常温：5%/周
+  refrigerated: 0.08, // 冷藏：8%/周
+  frozen: 0.03, // 冷冻：3%/周
 };
 
 // ============ 持有成本配置 ============
 
 export const HOLDING_COST_RATES: Record<StorageType, number> = {
-  normal: 0.02,        // 常温：2%/周
-  refrigerated: 0.05,  // 冷藏：5%/周（含电费）
-  frozen: 0.07,        // 冷冻：7%/周（含电费）
+  normal: 0.02, // 常温：2%/周
+  refrigerated: 0.05, // 冷藏：5%/周（含电费）
+  frozen: 0.07, // 冷冻：7%/周（含电费）
 };
 
 // ============ 缺货效果配置 ============
 // 按满足率分级，影响销量和口碑
 
 export const STOCKOUT_EFFECTS: StockoutEffect[] = [
-  { minFulfillment: 0.9, maxFulfillment: 1.0, salesModifier: 1.0, reputationImpact: 0, description: '备货充足，来一单出一单' },
-  { minFulfillment: 0.8, maxFulfillment: 0.9, salesModifier: 0.97, reputationImpact: -0.3, description: '偶尔断货，少数顾客不满' },
-  { minFulfillment: 0.7, maxFulfillment: 0.8, salesModifier: 0.93, reputationImpact: -0.8, description: '时有缺货，部分顾客白跑一趟' },
-  { minFulfillment: 0.6, maxFulfillment: 0.7, salesModifier: 0.87, reputationImpact: -1.5, description: '频繁断货，回头客明显减少' },
-  { minFulfillment: 0.5, maxFulfillment: 0.6, salesModifier: 0.82, reputationImpact: -3, description: '严重缺货，差评增多' },
-  { minFulfillment: 0.2, maxFulfillment: 0.5, salesModifier: 0.70, reputationImpact: -6, description: '经常没货，口碑急剧下降' },
-  { minFulfillment: 0.0, maxFulfillment: 0.2, salesModifier: 0.50, reputationImpact: -10, description: '基本断供，口碑崩了' },
+  {
+    minFulfillment: 0.9,
+    maxFulfillment: 1.0,
+    salesModifier: 1.0,
+    reputationImpact: 0,
+    description: "备货充足，来一单出一单",
+  },
+  {
+    minFulfillment: 0.8,
+    maxFulfillment: 0.9,
+    salesModifier: 0.97,
+    reputationImpact: -0.3,
+    description: "偶尔断货，少数顾客不满",
+  },
+  {
+    minFulfillment: 0.7,
+    maxFulfillment: 0.8,
+    salesModifier: 0.93,
+    reputationImpact: -0.8,
+    description: "时有缺货，部分顾客白跑一趟",
+  },
+  {
+    minFulfillment: 0.6,
+    maxFulfillment: 0.7,
+    salesModifier: 0.87,
+    reputationImpact: -1.5,
+    description: "频繁断货，回头客明显减少",
+  },
+  {
+    minFulfillment: 0.5,
+    maxFulfillment: 0.6,
+    salesModifier: 0.82,
+    reputationImpact: -3,
+    description: "严重缺货，差评增多",
+  },
+  {
+    minFulfillment: 0.2,
+    maxFulfillment: 0.5,
+    salesModifier: 0.7,
+    reputationImpact: -6,
+    description: "经常没货，口碑急剧下降",
+  },
+  {
+    minFulfillment: 0.0,
+    maxFulfillment: 0.2,
+    salesModifier: 0.5,
+    reputationImpact: -10,
+    description: "基本断供，口碑崩了",
+  },
 ];
 
 // ============ 补货策略配置 ============
 // 每个产品可独立设置补货策略
 
 export const RESTOCK_STRATEGIES: RestockStrategyConfig[] = [
-  { id: 'manual', name: '手动补货', targetStockWeeks: 0, description: '完全手动控制采购量' },
-  { id: 'auto_conservative', name: '保守补货', targetStockWeeks: 1, description: '自动补到1周用量，节省资金' },
-  { id: 'auto_standard', name: '标准补货', targetStockWeeks: 1.5, description: '自动补到1.5周用量（推荐）' },
-  { id: 'auto_aggressive', name: '激进补货', targetStockWeeks: 2.5, description: '自动补到2.5周用量，减少缺货但占用资金' },
+  {
+    id: "manual",
+    name: "手动补货",
+    targetStockWeeks: 0,
+    description: "完全手动控制采购量",
+  },
+  {
+    id: "auto_conservative",
+    name: "保守补货",
+    targetStockWeeks: 1,
+    description: "自动补到1周用量，节省资金",
+  },
+  {
+    id: "auto_standard",
+    name: "标准补货",
+    targetStockWeeks: 1.5,
+    description: "自动补到1.5周用量（推荐）",
+  },
+  {
+    id: "auto_aggressive",
+    name: "激进补货",
+    targetStockWeeks: 2.5,
+    description: "自动补到2.5周用量，减少缺货但占用资金",
+  },
 ];
 
 // ============ 工具函数 ============
@@ -54,7 +122,10 @@ export function getWasteRate(storageType: StorageType): number {
 /**
  * 计算库存持有成本
  */
-export function calculateHoldingCost(value: number, storageType: StorageType): number {
+export function calculateHoldingCost(
+  value: number,
+  storageType: StorageType,
+): number {
   const rate = HOLDING_COST_RATES[storageType] ?? 0.02;
   return value * rate;
 }
@@ -64,7 +135,7 @@ export function calculateHoldingCost(value: number, storageType: StorageType): n
  */
 export function getStockoutEffect(fulfillment: number): StockoutEffect {
   const effect = STOCKOUT_EFFECTS.find(
-    e => fulfillment >= e.minFulfillment && fulfillment <= e.maxFulfillment
+    (e) => fulfillment >= e.minFulfillment && fulfillment <= e.maxFulfillment,
   );
   return effect || STOCKOUT_EFFECTS[STOCKOUT_EFFECTS.length - 1];
 }
@@ -72,8 +143,12 @@ export function getStockoutEffect(fulfillment: number): StockoutEffect {
 /**
  * 获取补货策略配置
  */
-export function getRestockStrategyConfig(strategy: RestockStrategy): RestockStrategyConfig {
-  return RESTOCK_STRATEGIES.find(s => s.id === strategy) || RESTOCK_STRATEGIES[0];
+export function getRestockStrategyConfig(
+  strategy: RestockStrategy,
+): RestockStrategyConfig {
+  return (
+    RESTOCK_STRATEGIES.find((s) => s.id === strategy) || RESTOCK_STRATEGIES[0]
+  );
 }
 
 /**
@@ -88,9 +163,9 @@ export function calculateRestockQuantity(
   currentStock: number,
   lastWeekSales: number,
   strategy: RestockStrategy,
-  cognitionLevel?: number
+  cognitionLevel?: number,
 ): number {
-  if (strategy === 'manual') return 0;
+  if (strategy === "manual") return 0;
 
   const config = getRestockStrategyConfig(strategy);
   // 首周没有销量数据时，用默认预估值
@@ -107,13 +182,13 @@ export function calculateRestockQuantity(
   if (cognitionLevel !== undefined && cognitionLevel < 4) {
     let deviationRate = 0;
     if (cognitionLevel <= 1) {
-      deviationRate = 0.30; // Lv0-1: ±30% 偏差
+      deviationRate = 0.3; // Lv0-1: ±30% 偏差
     } else if (cognitionLevel <= 3) {
-      deviationRate = 0.10; // Lv2-3: ±10% 偏差
+      deviationRate = 0.1; // Lv2-3: ±10% 偏差
     }
     // Lv4+: 0% 偏差（精准补货）
     if (deviationRate > 0) {
-      const deviation = 1 + (Math.random() - 0.5) * 2 * deviationRate;
+      const deviation = 1 + (rand() - 0.5) * 2 * deviationRate;
       targetStock = Math.ceil(targetStock * deviation);
     }
   }

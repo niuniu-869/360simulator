@@ -2,15 +2,16 @@
 // 筹备阶段：费用已知，市场信息模糊
 // 经营阶段：根据认知等级逐步清晰
 
-import type { CognitionLevel } from '@/types/game';
-import { INFO_FUZZ_CONFIG } from '@/data/cognitionData';
+import type { CognitionLevel } from "@/types/game";
+import { INFO_FUZZ_CONFIG } from "@/data/cognitionData";
+import { rand } from "@/lib/rng";
 
 // 模糊化结果类型
 export interface FuzzResult {
-  display: string;      // 显示的文本
-  isExact: boolean;     // 是否精确值
-  isHidden: boolean;    // 是否隐藏
-  tooltip?: string;     // 提示文本
+  display: string; // 显示的文本
+  isExact: boolean; // 是否精确值
+  isHidden: boolean; // 是否隐藏
+  tooltip?: string; // 提示文本
 }
 
 // 格式化金额
@@ -36,9 +37,9 @@ export function applyFuzz(
   infoType: string,
   value: number,
   cognitionLevel: CognitionLevel,
-  formatter: (v: number) => string = formatNumber
+  formatter: (v: number) => string = formatNumber,
 ): FuzzResult {
-  const config = INFO_FUZZ_CONFIG.find(c => c.infoType === infoType);
+  const config = INFO_FUZZ_CONFIG.find((c) => c.infoType === infoType);
 
   // 没有配置，返回精确值
   if (!config) {
@@ -49,7 +50,7 @@ export function applyFuzz(
     };
   }
 
-  const fuzzLevel = config.fuzzLevels.find(f => f.level === cognitionLevel);
+  const fuzzLevel = config.fuzzLevels.find((f) => f.level === cognitionLevel);
   if (!fuzzLevel) {
     return {
       display: formatter(value),
@@ -59,53 +60,56 @@ export function applyFuzz(
   }
 
   switch (fuzzLevel.type) {
-    case 'hidden':
+    case "hidden":
       return {
-        display: '???',
+        display: "???",
         isExact: false,
         isHidden: true,
         tooltip: `需要认知等级 ${config.unlockLevel} 才能查看`,
       };
 
-    case 'fuzzy':
-      {
-        const words = fuzzLevel.fuzzyWords || ['未知'];
-        let wordIndex = 0;
-        if (value > 0) {
-          wordIndex = Math.min(Math.floor(value / 5000), words.length - 1);
-        }
-        return {
-          display: words[wordIndex] || words[0],
-          isExact: false,
-          isHidden: false,
-          tooltip: '认知不足，数据模糊',
-        };
+    case "fuzzy": {
+      const words = fuzzLevel.fuzzyWords || ["未知"];
+      let wordIndex = 0;
+      if (value > 0) {
+        wordIndex = Math.min(Math.floor(value / 5000), words.length - 1);
       }
+      return {
+        display: words[wordIndex] || words[0],
+        isExact: false,
+        isHidden: false,
+        tooltip: "认知不足，数据模糊",
+      };
+    }
 
-    case 'range':
-      {
-        const COST_INFO_TYPES = ['variableCost', 'fixedCost', 'breakEvenPoint'];
-        const REVENUE_INFO_TYPES = ['weeklyRevenue', 'monthlyRevenue', 'grossMargin', 'netProfit'];
-        let minRatio = fuzzLevel.minRatio || 0.8;
-        let maxRatio = fuzzLevel.maxRatio || 1.2;
-        if (COST_INFO_TYPES.includes(infoType)) {
-          minRatio = (fuzzLevel.minRatio || 0.8) * 0.85;
-          maxRatio = (fuzzLevel.maxRatio || 1.2) * 0.9;
-        } else if (REVENUE_INFO_TYPES.includes(infoType)) {
-          minRatio = (fuzzLevel.minRatio || 0.8) * 1.1;
-          maxRatio = (fuzzLevel.maxRatio || 1.2) * 1.15;
-        }
-        const minVal = Math.round(value * minRatio);
-        const maxVal = Math.round(value * maxRatio);
-        return {
-          display: `${formatter(minVal)} ~ ${formatter(maxVal)}`,
-          isExact: false,
-          isHidden: false,
-          tooltip: '认知有限，显示范围值',
-        };
+    case "range": {
+      const COST_INFO_TYPES = ["variableCost", "fixedCost", "breakEvenPoint"];
+      const REVENUE_INFO_TYPES = [
+        "weeklyRevenue",
+        "monthlyRevenue",
+        "grossMargin",
+        "netProfit",
+      ];
+      let minRatio = fuzzLevel.minRatio || 0.8;
+      let maxRatio = fuzzLevel.maxRatio || 1.2;
+      if (COST_INFO_TYPES.includes(infoType)) {
+        minRatio = (fuzzLevel.minRatio || 0.8) * 0.85;
+        maxRatio = (fuzzLevel.maxRatio || 1.2) * 0.9;
+      } else if (REVENUE_INFO_TYPES.includes(infoType)) {
+        minRatio = (fuzzLevel.minRatio || 0.8) * 1.1;
+        maxRatio = (fuzzLevel.maxRatio || 1.2) * 1.15;
       }
+      const minVal = Math.round(value * minRatio);
+      const maxVal = Math.round(value * maxRatio);
+      return {
+        display: `${formatter(minVal)} ~ ${formatter(maxVal)}`,
+        isExact: false,
+        isHidden: false,
+        tooltip: "认知有限，显示范围值",
+      };
+    }
 
-    case 'exact':
+    case "exact":
     default:
       return {
         display: formatter(value),
@@ -119,27 +123,27 @@ export function applyFuzz(
 // 有区分但不精确，根据数值大小给出不同描述
 export function fuzzTraffic(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   // 筹备阶段（认知0-1）：有区分的模糊描述
   if (cognitionLevel <= 1) {
     let description: string;
     if (value >= 800) {
-      description = '人流很旺';
+      description = "人流很旺";
     } else if (value >= 500) {
-      description = '人流较多';
+      description = "人流较多";
     } else if (value >= 300) {
-      description = '人流一般';
+      description = "人流一般";
     } else if (value >= 150) {
-      description = '人流偏少';
+      description = "人流偏少";
     } else {
-      description = '人流稀少';
+      description = "人流稀少";
     }
     return {
       display: description,
       isExact: false,
       isHidden: false,
-      tooltip: '需要实地考察才能准确判断',
+      tooltip: "需要实地考察才能准确判断",
     };
   }
   // 认知2：给出大致范围
@@ -164,7 +168,7 @@ export function fuzzTraffic(
 // 租金是花出去的钱，应该是已知的
 export function fuzzRent(
   value: number,
-  _cognitionLevel: CognitionLevel
+  _cognitionLevel: CognitionLevel,
 ): FuzzResult {
   void _cognitionLevel;
   // 租金是已知费用，直接显示精确值
@@ -179,23 +183,23 @@ export function fuzzRent(
 // 竞争度是市场信息，筹备阶段应该模糊
 export function fuzzCompetition(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   // 筹备阶段（认知0-1）：模糊描述
   if (cognitionLevel <= 1) {
     let description: string;
     if (value > 0.8) {
-      description = '竞争激烈';
+      description = "竞争激烈";
     } else if (value > 0.5) {
-      description = '竞争一般';
+      description = "竞争一般";
     } else {
-      description = '竞争较少';
+      description = "竞争较少";
     }
     return {
       display: description,
       isExact: false,
       isHidden: false,
-      tooltip: '需要深入调研才能准确判断',
+      tooltip: "需要深入调研才能准确判断",
     };
   }
   // 认知2：给出范围
@@ -221,30 +225,31 @@ export function fuzzCompetition(
 // 筹备阶段新手不太懂毛利率概念
 export function fuzzMargin(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   // 认知0：完全不懂
   if (cognitionLevel === 0) {
     return {
-      display: '???',
+      display: "???",
       isExact: false,
       isHidden: true,
-      tooltip: '什么是毛利率？',
+      tooltip: "什么是毛利率？",
     };
   }
   // 认知1：只知道高低
   if (cognitionLevel === 1) {
-    const level = value > 0.6 ? '应该挺高' : value > 0.4 ? '感觉一般' : '好像不高';
+    const level =
+      value > 0.6 ? "应该挺高" : value > 0.4 ? "感觉一般" : "好像不高";
     return {
       display: level,
       isExact: false,
       isHidden: false,
-      tooltip: '不太确定具体多少',
+      tooltip: "不太确定具体多少",
     };
   }
   // 认知2：大致水平
   if (cognitionLevel === 2) {
-    const level = value > 0.6 ? '高' : value > 0.4 ? '中' : '低';
+    const level = value > 0.6 ? "高" : value > 0.4 ? "中" : "低";
     return {
       display: level,
       isExact: false,
@@ -274,7 +279,7 @@ export function fuzzMargin(
 // 产品进货成本是已知费用
 export function fuzzCost(
   value: number,
-  _cognitionLevel: CognitionLevel
+  _cognitionLevel: CognitionLevel,
 ): FuzzResult {
   void _cognitionLevel;
   // 成本是已知费用，直接显示
@@ -289,7 +294,7 @@ export function fuzzCost(
 // 工资是已知费用
 export function fuzzSalary(
   value: number,
-  _cognitionLevel: CognitionLevel
+  _cognitionLevel: CognitionLevel,
 ): FuzzResult {
   void _cognitionLevel;
   // 工资是已知费用，直接显示
@@ -304,7 +309,7 @@ export function fuzzSalary(
 // 装修费用是已知费用
 export function fuzzDecorationCost(
   value: number,
-  _cognitionLevel: CognitionLevel
+  _cognitionLevel: CognitionLevel,
 ): FuzzResult {
   void _cognitionLevel;
   // 装修费用是已知费用，直接显示
@@ -321,11 +326,11 @@ export function fuzzDecorationCost(
 // 预估收入模糊化（新手总是高估收入）
 export function fuzzEstimatedRevenue(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): { display: string; actualMultiplier: number } {
   // 筹备阶段（认知0-1）：大幅高估收入
   if (cognitionLevel <= 1) {
-    const multiplier = 1.8 + Math.random() * 0.4; // 1.8-2.2倍
+    const multiplier = 1.8 + rand() * 0.4; // 1.8-2.2倍
     const inflatedValue = Math.round(value * multiplier);
     return {
       display: formatMoney(inflatedValue),
@@ -334,7 +339,7 @@ export function fuzzEstimatedRevenue(
   }
   // 认知2：略微高估
   if (cognitionLevel === 2) {
-    const multiplier = 1.3 + Math.random() * 0.2; // 1.3-1.5倍
+    const multiplier = 1.3 + rand() * 0.2; // 1.3-1.5倍
     const inflatedValue = Math.round(value * multiplier);
     return {
       display: formatMoney(inflatedValue),
@@ -351,11 +356,11 @@ export function fuzzEstimatedRevenue(
 // 预估成本模糊化（成本相对清楚但略有偏差）
 export function fuzzEstimatedCost(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): { display: string; actualMultiplier: number } {
   // 筹备阶段（认知0-1）：略微低估成本
   if (cognitionLevel <= 1) {
-    const multiplier = 0.85 + Math.random() * 0.1; // 0.85-0.95倍
+    const multiplier = 0.85 + rand() * 0.1; // 0.85-0.95倍
     const deflatedValue = Math.round(value * multiplier);
     return {
       display: formatMoney(deflatedValue),
@@ -374,15 +379,15 @@ export function fuzzEstimatedCost(
 // 周边店铺价格模糊化
 export function fuzzShopPrice(
   price: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   // 认知0：完全看不到价格
   if (cognitionLevel === 0) {
     return {
-      display: '???',
+      display: "???",
       isExact: false,
       isHidden: true,
-      tooltip: '需要提升认知才能看到价格',
+      tooltip: "需要提升认知才能看到价格",
     };
   }
   // 认知1：大致范围
@@ -393,7 +398,7 @@ export function fuzzShopPrice(
       display: `约¥${min}~${max}`,
       isExact: false,
       isHidden: false,
-      tooltip: '价格估算不太准确',
+      tooltip: "价格估算不太准确",
     };
   }
   // 认知2+：精确价格
@@ -407,20 +412,20 @@ export function fuzzShopPrice(
 // 周边店铺数量模糊化
 export function fuzzShopCount(
   count: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   // 认知0：只知道大概
   if (cognitionLevel === 0) {
     let desc: string;
-    if (count >= 8) desc = '很多家';
-    else if (count >= 5) desc = '好几家';
-    else if (count >= 3) desc = '几家';
-    else desc = '不多';
+    if (count >= 8) desc = "很多家";
+    else if (count >= 5) desc = "好几家";
+    else if (count >= 3) desc = "几家";
+    else desc = "不多";
     return {
       display: desc,
       isExact: false,
       isHidden: false,
-      tooltip: '没仔细数过',
+      tooltip: "没仔细数过",
     };
   }
   // 认知1+：精确数量
@@ -434,24 +439,24 @@ export function fuzzShopCount(
 // 市场份额模糊化
 export function fuzzMarketShare(
   share: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   // 认知0-1：完全看不到
   if (cognitionLevel <= 1) {
     return {
-      display: '???',
+      display: "???",
       isExact: false,
       isHidden: true,
-      tooltip: '需要更高认知才能分析市场份额',
+      tooltip: "需要更高认知才能分析市场份额",
     };
   }
   // 认知2：模糊描述
   if (cognitionLevel === 2) {
     let desc: string;
-    if (share >= 0.5) desc = '份额较大';
-    else if (share >= 0.3) desc = '份额中等';
-    else if (share >= 0.15) desc = '份额偏小';
-    else desc = '份额很小';
+    if (share >= 0.5) desc = "份额较大";
+    else if (share >= 0.3) desc = "份额中等";
+    else if (share >= 0.15) desc = "份额偏小";
+    else desc = "份额很小";
     return {
       display: desc,
       isExact: false,
@@ -486,12 +491,12 @@ export function fuzzMarketShare(
  */
 export function fuzzToColloquial(value: number, precision: 0 | 1): string {
   const abs = Math.abs(value);
-  const sign = value < 0 ? '亏了' : '赚了';
+  const sign = value < 0 ? "亏了" : "赚了";
   const isLoss = value < 0;
 
   if (precision === 0) {
     // 认知0：非常粗略的口语
-    if (abs < 200) return isLoss ? '亏了一点点' : '赚了一点点';
+    if (abs < 200) return isLoss ? "亏了一点点" : "赚了一点点";
     if (abs < 800) return `${sign}几百块`;
     if (abs < 1500) return `${sign}一千来块`;
     if (abs < 3000) return `${sign}两三千`;
@@ -505,7 +510,7 @@ export function fuzzToColloquial(value: number, precision: 0 | 1): string {
   }
 
   // precision === 1：认知1级，稍精确的口语
-  if (abs < 300) return isLoss ? '小亏几百' : '小赚几百';
+  if (abs < 300) return isLoss ? "小亏几百" : "小赚几百";
   if (abs < 800) return `${sign}五六百`;
   if (abs < 1200) return `${sign}一千出头`;
   if (abs < 2000) return `${sign}大概一两千`;
@@ -524,35 +529,35 @@ export function fuzzToColloquial(value: number, precision: 0 | 1): string {
  */
 export function colloquialAmount(abs: number, precision: 0 | 1): string {
   if (precision === 0) {
-    if (abs < 200) return '一点点';
-    if (abs < 800) return '几百块';
-    if (abs < 1500) return '一千来块';
-    if (abs < 3000) return '两三千';
-    if (abs < 5000) return '三五千';
-    if (abs < 8000) return '五六千';
-    if (abs < 12000) return '大几千';
-    if (abs < 20000) return '一两万';
-    if (abs < 35000) return '两三万';
-    return '好几万';
+    if (abs < 200) return "一点点";
+    if (abs < 800) return "几百块";
+    if (abs < 1500) return "一千来块";
+    if (abs < 3000) return "两三千";
+    if (abs < 5000) return "三五千";
+    if (abs < 8000) return "五六千";
+    if (abs < 12000) return "大几千";
+    if (abs < 20000) return "一两万";
+    if (abs < 35000) return "两三万";
+    return "好几万";
   }
-  if (abs < 300) return '几百块';
-  if (abs < 800) return '五六百';
-  if (abs < 1200) return '一千出头';
-  if (abs < 2000) return '一两千';
-  if (abs < 3500) return '三千左右';
-  if (abs < 5000) return '四五千';
-  if (abs < 7000) return '五六千左右';
-  if (abs < 10000) return '七八千';
-  if (abs < 15000) return '一万出头';
-  if (abs < 25000) return '两万左右';
-  return '好几万';
+  if (abs < 300) return "几百块";
+  if (abs < 800) return "五六百";
+  if (abs < 1200) return "一千出头";
+  if (abs < 2000) return "一两千";
+  if (abs < 3500) return "三千左右";
+  if (abs < 5000) return "四五千";
+  if (abs < 7000) return "五六千左右";
+  if (abs < 10000) return "七八千";
+  if (abs < 15000) return "一万出头";
+  if (abs < 25000) return "两万左右";
+  return "好几万";
 }
 
 // 经营面板成本模糊化
 export function fuzzOperatingCost(
   value: number,
   cognitionLevel: CognitionLevel,
-  _costType: 'variable' | 'fixed'
+  _costType: "variable" | "fixed",
 ): FuzzResult {
   void _costType;
   if (cognitionLevel === 0) {
@@ -560,7 +565,7 @@ export function fuzzOperatingCost(
       display: colloquialAmount(Math.abs(value), 0),
       isExact: false,
       isHidden: false,
-      tooltip: '不太清楚具体花了多少',
+      tooltip: "不太清楚具体花了多少",
     };
   }
   if (cognitionLevel === 1) {
@@ -568,7 +573,7 @@ export function fuzzOperatingCost(
       display: colloquialAmount(Math.abs(value), 1),
       isExact: false,
       isHidden: false,
-      tooltip: '大概知道花了多少',
+      tooltip: "大概知道花了多少",
     };
   }
   if (cognitionLevel === 2) {
@@ -597,16 +602,16 @@ export function fuzzOperatingCost(
 // 经营面板收入模糊化
 export function fuzzOperatingRevenue(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   if (cognitionLevel === 0) {
     // 口语化 + 略微高估（新手总觉得赚得多）
-    const inflated = Math.round(value * (1.3 + Math.random() * 0.4));
+    const inflated = Math.round(value * (1.3 + rand() * 0.4));
     return {
       display: colloquialAmount(inflated, 0),
       isExact: false,
       isHidden: false,
-      tooltip: '感觉收入还不错',
+      tooltip: "感觉收入还不错",
     };
   }
   if (cognitionLevel === 1) {
@@ -649,14 +654,14 @@ export function fuzzOperatingRevenue(
 // 经营面板利润模糊化
 export function fuzzOperatingProfit(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   if (cognitionLevel === 0) {
     return {
       display: fuzzToColloquial(value, 0),
       isExact: false,
       isHidden: false,
-      tooltip: '完全凭感觉',
+      tooltip: "完全凭感觉",
     };
   }
   if (cognitionLevel === 1) {
@@ -671,7 +676,8 @@ export function fuzzOperatingProfit(
     const max = Math.round(value * 1.3);
     return {
       display: `${formatMoney(Math.min(min, max))} ~ ${formatMoney(Math.max(min, max))}`,
-      isExact: false, isHidden: false,
+      isExact: false,
+      isHidden: false,
     };
   }
   if (cognitionLevel === 3) {
@@ -679,7 +685,8 @@ export function fuzzOperatingProfit(
     const max = Math.round(value * 1.15);
     return {
       display: `${formatMoney(Math.min(min, max))} ~ ${formatMoney(Math.max(min, max))}`,
-      isExact: false, isHidden: false,
+      isExact: false,
+      isHidden: false,
     };
   }
   if (cognitionLevel === 4) {
@@ -687,7 +694,8 @@ export function fuzzOperatingProfit(
     const max = Math.round(value * 1.05);
     return {
       display: `${formatMoney(Math.min(min, max))} ~ ${formatMoney(Math.max(min, max))}`,
-      isExact: false, isHidden: false,
+      isExact: false,
+      isHidden: false,
     };
   }
   return { display: formatMoney(value), isExact: true, isHidden: false };
@@ -698,17 +706,18 @@ export function fuzzOperatingProfit(
 // 供需面板数据模糊化（4级才解锁）
 export function fuzzSupplyDemandValue(
   value: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzResult {
   if (cognitionLevel < 4) {
-    return { display: '???', isExact: false, isHidden: true };
+    return { display: "???", isExact: false, isHidden: true };
   }
   if (cognitionLevel === 4) {
     const min = Math.round(value * 0.8);
     const max = Math.round(value * 1.2);
     return {
       display: `${formatNumber(min)} ~ ${formatNumber(max)}`,
-      isExact: false, isHidden: false,
+      isExact: false,
+      isHidden: false,
     };
   }
   return { display: formatNumber(value), isExact: true, isHidden: false };
@@ -733,24 +742,49 @@ export interface FuzzAcceptResult {
  */
 export function fuzzAcceptRatio(
   ratio: number,
-  cognitionLevel: CognitionLevel
+  cognitionLevel: CognitionLevel,
 ): FuzzAcceptResult {
   // 认知0级：极粗略的两档方向感
   if (cognitionLevel === 0) {
     if (ratio <= 1.15) {
-      return { label: '感觉还行', textColor: 'text-slate-400', barColor: 'bg-slate-500', barWidth: 55 };
+      return {
+        label: "感觉还行",
+        textColor: "text-slate-400",
+        barColor: "bg-slate-500",
+        barWidth: 55,
+      };
     }
-    return { label: '好像有点贵', textColor: 'text-amber-400', barColor: 'bg-amber-500', barWidth: 35 };
+    return {
+      label: "好像有点贵",
+      textColor: "text-amber-400",
+      barColor: "bg-amber-500",
+      barWidth: 35,
+    };
   }
 
   // 认知1级：三档粗略感知，阈值偏移+0.10（新手对高价更迟钝）
   if (cognitionLevel === 1) {
     if (ratio <= 1.0) {
-      return { label: '便宜', textColor: 'text-emerald-400', barColor: 'bg-emerald-500', barWidth: 75 };
+      return {
+        label: "便宜",
+        textColor: "text-emerald-400",
+        barColor: "bg-emerald-500",
+        barWidth: 75,
+      };
     } else if (ratio <= 1.25) {
-      return { label: '正常', textColor: 'text-yellow-400', barColor: 'bg-yellow-500', barWidth: 55 };
+      return {
+        label: "正常",
+        textColor: "text-yellow-400",
+        barColor: "bg-yellow-500",
+        barWidth: 55,
+      };
     }
-    return { label: '偏贵', textColor: 'text-red-400', barColor: 'bg-red-500', barWidth: 30 };
+    return {
+      label: "偏贵",
+      textColor: "text-red-400",
+      barColor: "bg-red-500",
+      barWidth: 30,
+    };
   }
 
   // 认知2级：四档感知，阈值偏移+0.05
@@ -775,25 +809,65 @@ export function fuzzAcceptRatio(
 /** 带阈值偏移的接受度判定（offset > 0 = 对高价更迟钝） */
 function acceptResultWithOffset(r: number, offset: number): FuzzAcceptResult {
   if (r <= 0.9 + offset) {
-    return { label: '很划算', textColor: 'text-emerald-400', barColor: 'bg-emerald-500', barWidth: 90 };
+    return {
+      label: "很划算",
+      textColor: "text-emerald-400",
+      barColor: "bg-emerald-500",
+      barWidth: 90,
+    };
   } else if (r <= 1.0 + offset) {
-    return { label: '合理', textColor: 'text-emerald-400', barColor: 'bg-emerald-400', barWidth: 70 };
+    return {
+      label: "合理",
+      textColor: "text-emerald-400",
+      barColor: "bg-emerald-400",
+      barWidth: 70,
+    };
   } else if (r <= 1.15 + offset) {
-    return { label: '偏贵', textColor: 'text-yellow-400', barColor: 'bg-yellow-500', barWidth: 40 };
+    return {
+      label: "偏贵",
+      textColor: "text-yellow-400",
+      barColor: "bg-yellow-500",
+      barWidth: 40,
+    };
   }
-  return { label: '太贵了', textColor: 'text-red-400', barColor: 'bg-red-500', barWidth: 15 };
+  return {
+    label: "太贵了",
+    textColor: "text-red-400",
+    barColor: "bg-red-500",
+    barWidth: 15,
+  };
 }
 
 /** 根据感知比率返回精确的接受度结果 */
 function acceptResultFromRatio(r: number): FuzzAcceptResult {
   if (r <= 0.9) {
-    return { label: '很划算', textColor: 'text-emerald-400', barColor: 'bg-emerald-500', barWidth: 90 };
+    return {
+      label: "很划算",
+      textColor: "text-emerald-400",
+      barColor: "bg-emerald-500",
+      barWidth: 90,
+    };
   } else if (r <= 1.0) {
-    return { label: '合理', textColor: 'text-emerald-400', barColor: 'bg-emerald-400', barWidth: 70 };
+    return {
+      label: "合理",
+      textColor: "text-emerald-400",
+      barColor: "bg-emerald-400",
+      barWidth: 70,
+    };
   } else if (r <= 1.15) {
-    return { label: '偏贵', textColor: 'text-yellow-400', barColor: 'bg-yellow-500', barWidth: 40 };
+    return {
+      label: "偏贵",
+      textColor: "text-yellow-400",
+      barColor: "bg-yellow-500",
+      barWidth: 40,
+    };
   } else {
-    return { label: '太贵了', textColor: 'text-red-400', barColor: 'bg-red-500', barWidth: 15 };
+    return {
+      label: "太贵了",
+      textColor: "text-red-400",
+      barColor: "bg-red-500",
+      barWidth: 15,
+    };
   }
 }
 
@@ -802,26 +876,27 @@ function acceptResultFromRatio(r: number): FuzzAcceptResult {
 export function fuzzWeeklySummaryValue(
   value: number,
   cognitionLevel: CognitionLevel,
-  dataType: 'money' | 'count' | 'percent'
+  dataType: "money" | "count" | "percent",
 ): FuzzResult {
-  const fmt = dataType === 'money'
-    ? formatMoney
-    : dataType === 'percent'
-    ? (v: number) => `${v.toFixed(1)}%`
-    : formatNumber;
+  const fmt =
+    dataType === "money"
+      ? formatMoney
+      : dataType === "percent"
+        ? (v: number) => `${v.toFixed(1)}%`
+        : formatNumber;
 
   if (cognitionLevel === 0) {
-    if (dataType === 'money') {
+    if (dataType === "money") {
       return {
         display: colloquialAmount(Math.abs(value), 0),
         isExact: false,
         isHidden: false,
       };
     }
-    return { display: '???', isExact: false, isHidden: true };
+    return { display: "???", isExact: false, isHidden: true };
   }
   if (cognitionLevel === 1) {
-    if (dataType === 'money') {
+    if (dataType === "money") {
       return {
         display: colloquialAmount(Math.abs(value), 1),
         isExact: false,
@@ -832,7 +907,8 @@ export function fuzzWeeklySummaryValue(
     const max = Math.round(value * 1.5);
     return {
       display: `${fmt(Math.min(min, max))} ~ ${fmt(Math.max(min, max))}`,
-      isExact: false, isHidden: false,
+      isExact: false,
+      isHidden: false,
     };
   }
   if (cognitionLevel === 2) {
@@ -840,7 +916,8 @@ export function fuzzWeeklySummaryValue(
     const max = Math.round(value * 1.2);
     return {
       display: `${fmt(Math.min(min, max))} ~ ${fmt(Math.max(min, max))}`,
-      isExact: false, isHidden: false,
+      isExact: false,
+      isHidden: false,
     };
   }
   return { display: fmt(value), isExact: true, isHidden: false };

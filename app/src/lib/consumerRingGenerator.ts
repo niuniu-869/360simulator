@@ -3,19 +3,33 @@
  * 选址时根据区位类型随机生成4层距离环的消费者池
  */
 
-import type { ConsumerRing, CustomerType, RingId, Location, StoreAddress, NearbyShop, Season } from '@/types/game';
+import type {
+  ConsumerRing,
+  CustomerType,
+  RingId,
+  Location,
+  StoreAddress,
+  NearbyShop,
+  Season,
+} from "@/types/game";
 import {
   RING_CONFIGS,
   CUSTOMER_RING_DECAY,
   getLocationRingMultiplier,
-} from '@/data/consumerRingData';
+} from "@/data/consumerRingData";
+import { rand } from "@/lib/rng";
 
-const CUSTOMER_TYPES: CustomerType[] = ['students', 'office', 'family', 'tourist'];
+const CUSTOMER_TYPES: CustomerType[] = [
+  "students",
+  "office",
+  "family",
+  "tourist",
+];
 
 // ============ 工具函数 ============
 
 function randomInRange(min: number, max: number): number {
-  return min + Math.random() * (max - min);
+  return min + rand() * (max - min);
 }
 
 // ============ 核心生成函数 ============
@@ -27,7 +41,7 @@ function randomInRange(min: number, max: number): number {
  */
 export function generateConsumerRings(
   location: Location,
-  address: StoreAddress
+  address: StoreAddress,
 ): ConsumerRing[] {
   const multiplierConfig = getLocationRingMultiplier(location.type);
   if (!multiplierConfig) {
@@ -42,16 +56,22 @@ export function generateConsumerRings(
 
   // Ring 1-3：基于 Ring 0 扩展
   const ring1 = createOuterRing(
-    'ring1', location, trafficMod,
-    multiplierConfig.ring1
+    "ring1",
+    location,
+    trafficMod,
+    multiplierConfig.ring1,
   );
   const ring2 = createOuterRing(
-    'ring2', location, trafficMod,
-    multiplierConfig.ring2
+    "ring2",
+    location,
+    trafficMod,
+    multiplierConfig.ring2,
   );
   const ring3 = createOuterRing(
-    'ring3', location, trafficMod,
-    multiplierConfig.ring3
+    "ring3",
+    location,
+    trafficMod,
+    multiplierConfig.ring3,
   );
 
   return [ring0, ring1, ring2, ring3];
@@ -59,19 +79,19 @@ export function generateConsumerRings(
 
 export function assignNearbyShopsToConsumerRings(
   consumerRings: ConsumerRing[],
-  nearbyShops: NearbyShop[]
+  nearbyShops: NearbyShop[],
 ): ConsumerRing[] {
-  const ringIds: RingId[] = ['ring0', 'ring1', 'ring2', 'ring3'];
-  const idsByRing = new Map<RingId, string[]>(
-    ringIds.map(id => [id, []])
-  );
+  const ringIds: RingId[] = ["ring0", "ring1", "ring2", "ring3"];
+  const idsByRing = new Map<RingId, string[]>(ringIds.map((id) => [id, []]));
 
-  nearbyShops.filter(s => !s.isClosing).forEach(shop => {
-    const ring = ringIds.includes(shop.ring) ? shop.ring : 'ring0';
-    idsByRing.get(ring)!.push(shop.id);
-  });
+  nearbyShops
+    .filter((s) => !s.isClosing)
+    .forEach((shop) => {
+      const ring = ringIds.includes(shop.ring) ? shop.ring : "ring0";
+      idsByRing.get(ring)!.push(shop.id);
+    });
 
-  return consumerRings.map(ring => ({
+  return consumerRings.map((ring) => ({
     ...ring,
     nearbyShopIds: idsByRing.get(ring.distance) ?? [],
   }));
@@ -94,7 +114,7 @@ function createRing0(location: Location, address: StoreAddress): ConsumerRing {
   };
 
   return {
-    distance: 'ring0',
+    distance: "ring0",
     label: ringConfig.label,
     consumers,
     baseConversion: ringConfig.baseConversion,
@@ -110,16 +130,16 @@ function createOuterRing(
   ringId: RingId,
   location: Location,
   trafficMod: number,
-  multiplierRange: { min: number; max: number }
+  multiplierRange: { min: number; max: number },
 ): ConsumerRing {
-  const ringConfig = RING_CONFIGS.find(r => r.id === ringId)!;
+  const ringConfig = RING_CONFIGS.find((r) => r.id === ringId)!;
 
   const consumers = {} as Record<CustomerType, number>;
 
-  CUSTOMER_TYPES.forEach(type => {
+  CUSTOMER_TYPES.forEach((type) => {
     const baseCount = location.footTraffic[type] * trafficMod;
     const multiplier = randomInRange(multiplierRange.min, multiplierRange.max);
-    const randomFactor = 0.8 + Math.random() * 0.4; // 0.8~1.2
+    const randomFactor = 0.8 + rand() * 0.4; // 0.8~1.2
     const decay = CUSTOMER_RING_DECAY[type][ringId];
 
     consumers[type] = Math.round(baseCount * multiplier * randomFactor * decay);
@@ -150,10 +170,10 @@ const SEASON_TRAFFIC_MOD: Record<Season, Record<CustomerType, number>> = {
  */
 export function applySeasonalTrafficVariation(
   baseRings: ConsumerRing[],
-  season: Season
+  season: Season,
 ): ConsumerRing[] {
   const mods = SEASON_TRAFFIC_MOD[season];
-  return baseRings.map(ring => ({
+  return baseRings.map((ring) => ({
     ...ring,
     consumers: {
       students: Math.round(ring.consumers.students * mods.students),

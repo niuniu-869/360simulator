@@ -26,14 +26,26 @@ export type QueryType =
   | 'weekly_report'
   | 'nearby_shops'
   | 'cognition'
-  | 'boss_action';
+  | 'boss_action'
+  | 'timeline'
+  | 'achievements'
+  | 'crisis_mode'
+  | 'toasts';
+
+/** prediction：参数化预测，用于 phase 2 决策预览 */
+export type PredictionRequest =
+  | { kind: 'price'; productId: string; newPrice: number }
+  | { kind: 'marketing'; activityId: string }
+  | { kind: 'boss_action'; actionId: string };
 
 // ============ 请求类型 ============
 
 export type AgentRequest =
   | { id: string; type: 'action'; action: GameAction }
   | { id: string; type: 'query'; query: QueryType }
-  | { id: string; type: 'meta'; meta: 'help' | 'reset' };
+  | { id: string; type: 'meta'; meta: 'help' | 'reset' | { reset: { seed?: number; scenarioId?: string } } }
+  | { id: string; type: 'prediction'; prediction: PredictionRequest }
+  | { id: string; type: 'auto_advance'; weeks: number };
 
 // ============ 响应类型 ============
 

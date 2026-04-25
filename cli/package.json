@@ -7,7 +7,14 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/main.js",
-    "dev": "tsx src/main.ts"
+    "dev": "tsx src/main.ts",
+    "agent-test:baseline": "node agent-tests/baseline.mjs",
+    "agent-test:phase1": "node agent-tests/phase1_pace.mjs",
+    "agent-test:phase2": "node agent-tests/phase2_feedback.mjs",
+    "agent-test:phase3": "node agent-tests/phase3_drama.mjs",
+    "agent-test:phase4": "node agent-tests/phase4_replay.mjs",
+    "agent-test:phase5": "node agent-tests/phase5_ui.mjs",
+    "agent-test:phase6": "node agent-tests/phase6_balance.mjs"
   },
   "dependencies": {
     "tsx": "^4.19.0"

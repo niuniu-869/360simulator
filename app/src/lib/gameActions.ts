@@ -15,6 +15,7 @@ import type {
   SupplyPriority,
 } from "@/types/game";
 import type { GameAction, ActionResult } from "@/lib/gameActionTypes";
+import { rand } from "@/lib/rng";
 import {
   applyEventEffects,
   rollInteractiveEvent,
@@ -102,8 +103,7 @@ function generateStaffId(): string {
   }
   // Fallback：毫秒 + 12 字符 36 进制随机（远超 4 字符的冲突风险）
   const entropy =
-    Math.random().toString(36).slice(2, 10) +
-    Math.random().toString(36).slice(2, 6);
+    rand().toString(36).slice(2, 10) + rand().toString(36).slice(2, 6);
   return `staff_${Date.now()}_${entropy}`;
 }
 
@@ -353,8 +353,8 @@ function handleSelectBrand(
   const initialReputation = brand.initialReputation || 10;
   const initialExposure =
     brand.type === "franchise"
-      ? 35 + Math.floor(Math.random() * 21) // 加盟品牌: 35-55（自带品牌知名度）
-      : 5 + Math.floor(Math.random() * 8); // 自主创业: 5-12（从零开始，几乎无人知晓）
+      ? 35 + Math.floor(rand() * 21) // 加盟品牌: 35-55（自带品牌知名度）
+      : 5 + Math.floor(rand() * 8); // 自主创业: 5-12（从零开始，几乎无人知晓）
   const launchSeed = brand.isQuickFranchise
     ? 18
     : brand.type === "franchise"
@@ -512,7 +512,7 @@ function handleSelectDecoration(
   if (!decoration) return fail(prev, `Decoration not found: ${decorationId}`);
 
   const isQF = prev.selectedBrand?.isQuickFranchise || false;
-  const costMarkup = isQF ? 1.3 + Math.random() * 0.2 : 1.0;
+  const costMarkup = isQF ? 1.3 + rand() * 0.2 : 1.0;
   const newCost = decoration.costPerSqm * prev.storeArea * costMarkup;
   return ok({
     ...prev,
@@ -666,7 +666,7 @@ function makeStaff(
   const skillLevel =
     isRecruit && channelQuality
       ? generateSkillLevel(channelQuality)
-      : Math.floor(Math.random() * 3) + 1;
+      : Math.floor(rand() * 3) + 1;
   const baseEff = (staffType.efficiency || 1.0) * (0.8 + skillLevel * 0.1);
   const baseSvc = (staffType.serviceQuality || 0.8) * (0.8 + skillLevel * 0.1);
   // 优先使用指定岗位（需在可用岗位列表中），否则用默认逻辑
@@ -683,14 +683,14 @@ function makeStaff(
   return {
     id: generateStaffId(),
     typeId: staffTypeId,
-    name: names[Math.floor(Math.random() * names.length)],
+    name: names[Math.floor(rand() * names.length)],
     salary,
     skillLevel,
     baseEfficiency: baseEff,
     efficiency: baseEff,
     baseServiceQuality: baseSvc,
     serviceQuality: baseSvc,
-    morale: 70 + Math.floor(Math.random() * 20),
+    morale: 70 + Math.floor(rand() * 20),
     fatigue: 0,
     hiredWeek: prev.currentWeek,
     assignedTask: initialTask,
@@ -961,7 +961,7 @@ function handleOpenStore(prev: GameState, season?: Season): ActionResult {
   };
   const startMonth = season
     ? seasonToMonth[season]
-    : Math.floor(Math.random() * 12) + 1;
+    : Math.floor(rand() * 12) + 1;
   const currentSeason = getSeasonFromMonth(startMonth);
   const scm = getEffectiveSupplyCostModifier(prev);
   const stockWeeks = prev.cognition.level < 1 ? 4 : 1.5;
@@ -1428,7 +1428,7 @@ function handleSetStaffSalary(
           : s.salaryRaiseMoraleBoost,
         // 降薪可能触发离职预警
         wantsToQuit:
-          !isRaise && Math.random() < SALARY_CONFIG.cutQuitCheckRate
+          !isRaise && rand() < SALARY_CONFIG.cutQuitCheckRate
             ? true
             : s.wantsToQuit,
       };
@@ -1590,7 +1590,7 @@ function handleRetainStaff(
   if (!staff) return fail(prev, "Staff not found");
   if (!staff.wantsToQuit) return fail(prev, "该员工没有离职意向");
 
-  const success = Math.random() < retainConfig.successRate;
+  const success = rand() < retainConfig.successRate;
 
   if (method === "raise") {
     const newSalary = Math.round(

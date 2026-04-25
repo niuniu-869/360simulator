@@ -824,3 +824,138 @@ function getOperatingActions(state: GameState): AvailableAction[] {
 
   return actions;
 }
+
+// ============ 决策预测 (Phase 2) ============
+
+export interface PricePrediction {
+  productId: string;
+  oldPrice: number;
+  newPrice: number;
+  /** 当前周需求估算（份/周） */
+  currentDemand: number;
+  /** 调价后需求估算（份/周） */
+  predictedDemand: number;
+  /** 收入增量（¥/周）— 仅本商品 */
+  deltaRevenue: number;
+  /** 利润增量（¥/周）— 仅近似，剔除营销/外卖二阶项 */
+  deltaProfit: number;
+  /** 盈亏平衡销量（份/周）— 单品成本回收所需销量 */
+  breakEvenSales: number;
+  /** 警告（如调价过激、低于成本等） */
+  warnings: string[];
+}
+
+/** 估算单价调整对当前周收入/利润的近似影响 */
+export function predictPriceChange(
+  state: GameState,
+  productId: string,
+  newPrice: number,
+): PricePrediction | null {
+  if (state.gamePhase !== "operating") return null;
+  const prod = state.selectedProducts.find((p) => p.id === productId);
+  if (!prod) return null;
+  const oldPrice = state.productPrices[productId] ?? prod.basePrice;
+  const sd = calculateSupplyDemand(state);
+  const cur = sd.productSales?.find((x) => x.productId === productId);
+  if (!cur) return null;
+
+  // 价格弹性近似：基于参考价的相对偏离 — 与 demandCalculator 的 priceElasticity 一致
+  const ref = prod.referencePrice || prod.basePrice;
+  const oldDeviation = (oldPrice - ref) / Math.max(1, ref);
+  const newDeviation = (newPrice - ref) / Math.max(1, ref);
+  const elasticity = 0.8;
+  const oldFactor = 1 - oldDeviation * elasticity;
+  const newFactor = 1 - newDeviation * elasticity;
+  const baseDemand = cur.demand / Math.max(0.05, oldFactor);
+  const predictedDemand = Math.max(0, Math.round(baseDemand * newFactor));
+
+  // 估算 unit cost：用产品 supplyCost 字段（如果存在），否则按 40% 估算
+  const unitCost =
+    (prod as { supplyCost?: number }).supplyCost ?? Math.max(0, oldPrice * 0.4);
+
+  const deltaRevenue = predictedDemand * newPrice - cur.demand * oldPrice;
+  const deltaProfit =
+    (newPrice - unitCost) * predictedDemand -
+    (oldPrice - unitCost) * cur.demand;
+  const breakEvenSales =
+    newPrice > unitCost
+      ? Math.ceil((unitCost * cur.demand) / Math.max(1, newPrice - unitCost))
+      : Infinity;
+
+  const warnings: string[] = [];
+  if (newPrice < unitCost) warnings.push("新价低于单位变动成本，越卖越亏");
+  if (Math.abs(newDeviation) > 0.4)
+    warnings.push("调价偏离参考价 > 40%，需求会显著变化");
+  if (predictedDemand <= 0) warnings.push("预测需求 ≤ 0，可能完全劝退顾客");
+
+  return {
+    productId,
+    oldPrice,
+    newPrice,
+    currentDemand: cur.demand,
+    predictedDemand,
+    deltaRevenue: Math.round(deltaRevenue),
+    deltaProfit: Math.round(deltaProfit),
+    breakEvenSales,
+    warnings,
+  };
+}
+
+export interface MarketingPrediction {
+  activityId: string;
+  weeklyCost: number;
+  estExposureGain: number;
+  estReputationGain: number;
+  /** 简易 ROI = (预计带来周收入增量 - 成本) / 成本 */
+  estROI: number;
+  /** 周回本估算 */
+  weeksToBreakEven: number;
+  notes: string[];
+}
+
+/** 估算开启某营销活动的预期 ROI（启发式） */
+export function predictMarketingROI(
+  state: GameState,
+  activityId: string,
+): MarketingPrediction | null {
+  const all = [
+    ...EXPOSURE_ACTIVITIES,
+    ...REPUTATION_ACTIVITIES,
+    ...MIXED_ACTIVITIES,
+  ];
+  const act = all.find((a) => a.id === activityId);
+  if (!act) return null;
+  const weeklyCost = act.baseCost ?? 0;
+  const expGain = act.exposureBoost ?? 0;
+  const repGain = act.reputationBoost ?? 0;
+  // 一个非常粗的"曝光每+1 → 周收入估算 +1%"启发式（仅做提示，不参与游戏逻辑）
+  const baselineRev =
+    state.weeklyRevenue ||
+    (state.revenueHistory?.[state.revenueHistory.length - 1] ?? 5000);
+  const revLift = baselineRev * (expGain * 0.012 + repGain * 0.018);
+  const estROI =
+    weeklyCost > 0
+      ? (revLift - weeklyCost) / weeklyCost
+      : revLift > 0
+        ? Infinity
+        : 0;
+  const weeksToBreakEven =
+    revLift > weeklyCost && revLift > 0
+      ? 1
+      : revLift > 0
+        ? Math.ceil(weeklyCost / revLift)
+        : Infinity;
+  const notes: string[] = [];
+  if (act.unique || (act.maxDuration && act.maxDuration <= 1))
+    notes.push("一次性活动，单次费用而非周费");
+  if (estROI < 0) notes.push("当前预测 ROI 为负，建议先提升基础流量");
+  return {
+    activityId,
+    weeklyCost,
+    estExposureGain: expGain,
+    estReputationGain: repGain,
+    estROI: Math.round(estROI * 100) / 100,
+    weeksToBreakEven,
+    notes,
+  };
+}

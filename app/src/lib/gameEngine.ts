@@ -80,6 +80,7 @@ import {
   generateDinnerInsight,
 } from "@/data/bossActionData";
 import type { InvestigationDimension } from "@/types/game";
+import { seedRng, rand } from "@/lib/rng";
 
 // ============ 常量 ============
 
@@ -396,10 +397,13 @@ export function calculateCOGS(
 // ============ 初始游戏状态 ============
 
 /** 创建初始游戏状态 */
-export function createInitialGameState(): GameState {
+export function createInitialGameState(seed?: number): GameState {
+  // 初始化全局 RNG（决定本局所有概率事件）
+  const usedSeed = seedRng(seed);
   return {
     currentWeek: 0,
     totalWeeks: 52,
+    seed: usedSeed,
     consecutiveProfits: 0,
     gamePhase: "setup",
     gameOverReason: null,
@@ -565,7 +569,7 @@ export function weeklyTick(prev: GameState): {
   let chainTriggeredEvent: InteractiveGameEvent | null = null;
 
   for (const ce of dueChains) {
-    if (Math.random() < ce.probability) {
+    if (rand() < ce.probability) {
       // 从 INTERACTIVE_EVENTS 中查找链式事件（链式事件不受去重限制）
       const chainEvent = INTERACTIVE_EVENTS.find((e) => e.id === ce.eventId);
       if (chainEvent && !stateAfterDelayed.pendingInteractiveEvent) {
@@ -917,8 +921,8 @@ export function weeklyTick(prev: GameState): {
 
   // 随机事件（12%概率，约每2个月一次，更接近现实）
   const event =
-    Math.random() > 0.88
-      ? gameEvents[Math.floor(Math.random() * gameEvents.length)]
+    rand() > 0.88
+      ? gameEvents[Math.floor(rand() * gameEvents.length)]
       : null;
 
   // 交互式事件抽取（v2.9）：上下文感知，每个事件最多触发一次
@@ -1198,7 +1202,7 @@ export function weeklyTick(prev: GameState): {
     if (cfg) {
       const [min, max] = cfg.expRange;
       const bossExp =
-        min === max ? min : min + Math.floor(Math.random() * (max - min + 1));
+        min === max ? min : min + Math.floor(rand() * (max - min + 1));
       expGained += bossExp;
       expSources.push({ label: cfg.label, exp: bossExp });
     }
@@ -1408,7 +1412,7 @@ export function weeklyTick(prev: GameState): {
     // 超时工作离职概率翻倍
     const effectiveQuitRisk =
       weeklyHours > 60 ? fatigueEffect.quitRisk * 2 : fatigueEffect.quitRisk;
-    if (effectiveQuitRisk > 0 && Math.random() < effectiveQuitRisk) {
+    if (effectiveQuitRisk > 0 && rand() < effectiveQuitRisk) {
       if (staff.wantsToQuit) {
         // 已标记过想辞职，本周真正离职
         quitStaffNames.push(staff.name);
@@ -1806,8 +1810,8 @@ export function weeklyTick(prev: GameState): {
       // 优先使用玩家选定的店铺，否则随机
       const targetShop = prevBossAction.targetShopId
         ? openShops.find((s) => s.id === prevBossAction.targetShopId) ||
-          openShops[Math.floor(Math.random() * openShops.length)]
-        : openShops[Math.floor(Math.random() * openShops.length)];
+          openShops[Math.floor(rand() * openShops.length)]
+        : openShops[Math.floor(rand() * openShops.length)];
 
       const revealed = newBossAction.revealedShopInfo[targetShop.id] || [];
       const unrevealed = INVESTIGATION_DIMENSIONS.map((d) => d.id).filter(
@@ -1824,7 +1828,7 @@ export function weeklyTick(prev: GameState): {
           ? [...unrevealed]
           : INVESTIGATION_DIMENSIONS.map((d) => d.id);
       for (let i = 0; i < dimCount && dimPool.length > 0; i++) {
-        const idx = Math.floor(Math.random() * dimPool.length);
+        const idx = Math.floor(rand() * dimPool.length);
         dims.push(dimPool[idx]);
         dimPool.splice(idx, 1);
       }

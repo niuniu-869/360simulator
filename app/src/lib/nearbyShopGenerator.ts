@@ -3,7 +3,13 @@
  * 负责生成、更新、关闭周边店铺
  */
 
-import type { NearbyShop, NearbyShopProduct, NearbyShopEvent, ShopCategory, RingId } from '@/types/game';
+import type {
+  NearbyShop,
+  NearbyShopProduct,
+  NearbyShopEvent,
+  ShopCategory,
+  RingId,
+} from "@/types/game";
 import {
   CHAIN_BRANDS,
   INDEPENDENT_TEMPLATES,
@@ -11,14 +17,19 @@ import {
   SHOP_CATEGORY_ICONS,
   generateShopName,
   type ChainBrandTemplate,
-} from '@/data/nearbyShopData';
-import { SHOP_RING_WEIGHTS } from '@/data/consumerRingData';
-import { getExposureCoefficient, getReputationCoefficient, getShopReputation } from '@/lib/supplyDemand/demandCalculator';
+} from "@/data/nearbyShopData";
+import { SHOP_RING_WEIGHTS } from "@/data/consumerRingData";
+import {
+  getExposureCoefficient,
+  getReputationCoefficient,
+  getShopReputation,
+} from "@/lib/supplyDemand/demandCalculator";
+import { rand } from "@/lib/rng";
 
 // ============ 工具函数 ============
 
 function randomInRange(min: number, max: number): number {
-  return min + Math.random() * (max - min);
+  return min + rand() * (max - min);
 }
 
 function randomInt(min: number, max: number): number {
@@ -26,10 +37,12 @@ function randomInt(min: number, max: number): number {
 }
 
 /** 按权重随机选择品类 */
-function weightedRandomCategory(weights: Record<ShopCategory, number>): ShopCategory {
+function weightedRandomCategory(
+  weights: Record<ShopCategory, number>,
+): ShopCategory {
   const entries = Object.entries(weights) as [ShopCategory, number][];
   const total = entries.reduce((sum, [, w]) => sum + w, 0);
-  let r = Math.random() * total;
+  let r = rand() * total;
   for (const [cat, w] of entries) {
     r -= w;
     if (r <= 0) return cat;
@@ -38,29 +51,37 @@ function weightedRandomCategory(weights: Record<ShopCategory, number>): ShopCate
 }
 
 /** 按档次分布随机选择 */
-function weightedRandomTier(dist: { budget: number; standard: number; premium: number }): 'budget' | 'standard' | 'premium' {
-  const r = Math.random();
-  if (r < dist.budget) return 'budget';
-  if (r < dist.budget + dist.standard) return 'standard';
-  return 'premium';
+function weightedRandomTier(dist: {
+  budget: number;
+  standard: number;
+  premium: number;
+}): "budget" | "standard" | "premium" {
+  const r = rand();
+  if (r < dist.budget) return "budget";
+  if (r < dist.budget + dist.standard) return "standard";
+  return "premium";
 }
 
 /** 按权重随机分配店铺到距离环 */
 function randomShopRing(): RingId {
-  const r = Math.random();
+  const r = rand();
   let cumulative = 0;
   for (const [ringId, weight] of Object.entries(SHOP_RING_WEIGHTS)) {
     cumulative += weight;
     if (r <= cumulative) return ringId as RingId;
   }
-  return 'ring0';
+  return "ring0";
 }
 
 // ============ 店铺创建函数 ============
 
 /** 从连锁品牌模板创建店铺 */
-function createChainShop(template: ChainBrandTemplate, week: number, rentBase: number): NearbyShop {
-  const products: NearbyShopProduct[] = template.products.map(p => {
+function createChainShop(
+  template: ChainBrandTemplate,
+  week: number,
+  rentBase: number,
+): NearbyShop {
+  const products: NearbyShopProduct[] = template.products.map((p) => {
     const price = randomInRange(p.priceRange.min, p.priceRange.max);
     return {
       name: p.name,
@@ -74,11 +95,11 @@ function createChainShop(template: ChainBrandTemplate, week: number, rentBase: n
   });
 
   return {
-    id: `shop_${template.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `shop_${template.id}_${Date.now()}_${rand().toString(36).slice(2, 6)}`,
     name: template.name,
     icon: template.icon,
     shopCategory: template.shopCategory,
-    brandType: 'chain',
+    brandType: "chain",
     brandTier: template.brandTier,
     products,
     exposure: template.exposure + randomInt(-5, 5),
@@ -90,35 +111,40 @@ function createChainShop(template: ChainBrandTemplate, week: number, rentBase: n
     weeklyProfit: 0,
     priceVolatility: template.priceVolatility,
     ring: randomShopRing(),
-    hasDelivery: Math.random() < template.deliveryProbability,
+    hasDelivery: rand() < template.deliveryProbability,
   };
 }
 
 /** 独立店铺按品类确定外卖概率 */
 const INDEPENDENT_DELIVERY_PROBABILITY: Record<ShopCategory, number> = {
-  meal: 0.70,
-  drink: 0.60,
-  food: 0.50,
-  snack: 0.40,
-  grocery: 0.20,
+  meal: 0.7,
+  drink: 0.6,
+  food: 0.5,
+  snack: 0.4,
+  grocery: 0.2,
   service: 0.05,
 };
 
 /** 从独立店铺模板创建店铺 */
 function createIndependentShop(
   category: ShopCategory,
-  tier: 'budget' | 'standard' | 'premium',
+  tier: "budget" | "standard" | "premium",
   week: number,
-  rentBase: number
+  rentBase: number,
 ): NearbyShop {
-  const templates = INDEPENDENT_TEMPLATES.filter(t => t.shopCategory === category);
-  const template = templates[Math.floor(Math.random() * templates.length)]
-    || INDEPENDENT_TEMPLATES[0];
+  const templates = INDEPENDENT_TEMPLATES.filter(
+    (t) => t.shopCategory === category,
+  );
+  const template =
+    templates[Math.floor(rand() * templates.length)] ||
+    INDEPENDENT_TEMPLATES[0];
 
-  const tierMultiplier = tier === 'budget' ? 0.8 : tier === 'premium' ? 1.3 : 1.0;
+  const tierMultiplier =
+    tier === "budget" ? 0.8 : tier === "premium" ? 1.3 : 1.0;
 
-  const products: NearbyShopProduct[] = template.products.map(p => {
-    const price = randomInRange(p.priceRange.min, p.priceRange.max) * tierMultiplier;
+  const products: NearbyShopProduct[] = template.products.map((p) => {
+    const price =
+      randomInRange(p.priceRange.min, p.priceRange.max) * tierMultiplier;
     return {
       name: p.name,
       category,
@@ -133,26 +159,32 @@ function createIndependentShop(
   const name = generateShopName(category);
 
   return {
-    id: `shop_ind_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `shop_ind_${Date.now()}_${rand().toString(36).slice(2, 6)}`,
     name,
     icon: SHOP_CATEGORY_ICONS[category],
     shopCategory: category,
-    brandType: 'independent',
+    brandType: "independent",
     brandTier: tier,
     products,
-    exposure: randomInRange(template.exposureRange.min, template.exposureRange.max),
+    exposure: randomInRange(
+      template.exposureRange.min,
+      template.exposureRange.max,
+    ),
     serviceQuality: randomInRange(
       template.serviceQualityRange.min,
-      template.serviceQualityRange.max
+      template.serviceQualityRange.max,
     ),
-    decorationLevel: randomInt(template.decorationRange.min, template.decorationRange.max),
+    decorationLevel: randomInt(
+      template.decorationRange.min,
+      template.decorationRange.max,
+    ),
     openedWeek: week,
     isClosing: false,
     monthlyRent: rentBase * 0.6,
     weeklyProfit: 0,
     priceVolatility: template.priceVolatility,
     ring: randomShopRing(),
-    hasDelivery: Math.random() < INDEPENDENT_DELIVERY_PROBABILITY[category],
+    hasDelivery: rand() < INDEPENDENT_DELIVERY_PROBABILITY[category],
   };
 }
 
@@ -164,36 +196,36 @@ function createIndependentShop(
 export function generateInitialShops(
   locationType: string,
   _addressId: string,
-  rentBase: number
+  rentBase: number,
 ): NearbyShop[] {
   const distribution = LOCATION_SHOP_DISTRIBUTIONS.find(
-    d => d.locationType === locationType
+    (d) => d.locationType === locationType,
   );
   if (!distribution) return [];
 
   const shopCount = randomInt(
     distribution.shopCountRange.min,
-    distribution.shopCountRange.max
+    distribution.shopCountRange.max,
   );
 
   const shops: NearbyShop[] = [];
 
   for (let i = 0; i < shopCount; i++) {
-    const isChain = Math.random() < distribution.chainProbability;
+    const isChain = rand() < distribution.chainProbability;
     const category = weightedRandomCategory(distribution.categoryWeights);
     const tier = weightedRandomTier(distribution.tierDistribution);
 
     if (isChain) {
       const preferred = distribution.preferredChains
-        .map(id => CHAIN_BRANDS.find(b => b.id === id))
+        .map((id) => CHAIN_BRANDS.find((b) => b.id === id))
         .filter((b): b is ChainBrandTemplate => !!b);
 
-      const matching = preferred.filter(b => b.shopCategory === category);
+      const matching = preferred.filter((b) => b.shopCategory === category);
       const candidates = matching.length > 0 ? matching : preferred;
 
       if (candidates.length > 0) {
-        const template = candidates[Math.floor(Math.random() * candidates.length)];
-        if (!shops.some(s => s.name === template.name)) {
+        const template = candidates[Math.floor(rand() * candidates.length)];
+        if (!shops.some((s) => s.name === template.name)) {
           shops.push(createChainShop(template, 0, rentBase));
           continue;
         }
@@ -213,30 +245,30 @@ export function tryGenerateNewShop(
   locationType: string,
   currentShops: NearbyShop[],
   week: number,
-  rentBase: number
+  rentBase: number,
 ): NearbyShop | null {
   // 每周10%概率新开一家店（Round 4: 竞争环境更加激烈）
-  if (Math.random() > 0.08) return null;
+  if (rand() > 0.08) return null;
 
   // 最多20家周边店铺
-  const activeShops = currentShops.filter(s => !s.isClosing);
+  const activeShops = currentShops.filter((s) => !s.isClosing);
   if (activeShops.length >= 20) return null;
 
   const distribution = LOCATION_SHOP_DISTRIBUTIONS.find(
-    d => d.locationType === locationType
+    (d) => d.locationType === locationType,
   );
   if (!distribution) return null;
 
-  const isChain = Math.random() < distribution.chainProbability * 0.8;
+  const isChain = rand() < distribution.chainProbability * 0.8;
   const category = weightedRandomCategory(distribution.categoryWeights);
   const tier = weightedRandomTier(distribution.tierDistribution);
 
   if (isChain) {
     const candidates = CHAIN_BRANDS.filter(
-      b => !activeShops.some(s => s.name === b.name)
+      (b) => !activeShops.some((s) => s.name === b.name),
     );
     if (candidates.length > 0) {
-      const template = candidates[Math.floor(Math.random() * candidates.length)];
+      const template = candidates[Math.floor(rand() * candidates.length)];
       return createChainShop(template, week, rentBase);
     }
   }
@@ -249,24 +281,24 @@ export function tryGenerateNewShop(
  */
 export function checkShopClosing(
   shops: NearbyShop[],
-  week: number
+  week: number,
 ): { updatedShops: NearbyShop[]; events: NearbyShopEvent[] } {
   const events: NearbyShopEvent[] = [];
 
-  const updatedShops = shops.map(shop => {
+  const updatedShops = shops.map((shop) => {
     if (shop.isClosing) return shop;
 
     // 新开店铺前4周不关门
     if (week - shop.openedWeek < 4) return shop;
 
     // Round 4: 连锁店几乎不关门(0.3%)，独立店关门率降至2%（竞争对手更持久）
-    const baseRate = shop.brandType === 'chain' ? 0.003 : 0.020;
+    const baseRate = shop.brandType === "chain" ? 0.003 : 0.02;
     const lossMultiplier = shop.weeklyProfit < 0 ? 3 : 1;
     const closeRate = baseRate * lossMultiplier;
 
-    if (Math.random() < closeRate) {
+    if (rand() < closeRate) {
       events.push({
-        type: 'closing',
+        type: "closing",
         shopId: shop.id,
         shopName: shop.name,
         description: `${shop.name}即将关门歇业`,
@@ -280,7 +312,7 @@ export function checkShopClosing(
 
   // 移除已过关门期限的店铺
   const finalShops = updatedShops.filter(
-    s => !(s.isClosing && s.closedWeek && week >= s.closedWeek)
+    (s) => !(s.isClosing && s.closedWeek && week >= s.closedWeek),
   );
 
   return { updatedShops: finalShops, events };
@@ -290,10 +322,10 @@ export function checkShopClosing(
  * 每周在 priceVolatility 范围内小幅波动价格
  */
 export function updateShopPrices(shops: NearbyShop[]): NearbyShop[] {
-  return shops.map(shop => {
+  return shops.map((shop) => {
     if (shop.isClosing) return shop;
 
-    const updatedProducts = shop.products.map(p => {
+    const updatedProducts = shop.products.map((p) => {
       const volatility = shop.priceVolatility;
       const change = 1 + randomInRange(-volatility, volatility);
       const newPrice = Math.max(p.baseCost * 1.1, p.price * change);
@@ -310,15 +342,19 @@ export function updateShopPrices(shops: NearbyShop[]): NearbyShop[] {
  */
 export function updateShopProfits(
   shops: NearbyShop[],
-  areaTotalDemand: number
+  areaTotalDemand: number,
 ): NearbyShop[] {
-  const activeShops = shops.filter(s => !s.isClosing);
+  const activeShops = shops.filter((s) => !s.isClosing);
 
-  const shopScores = activeShops.map(shop => {
-    const avgPrice = shop.products.length > 0
-      ? shop.products.reduce((s, p) => s + p.price, 0) / shop.products.length : 10;
-    const avgAppeal = shop.products.length > 0
-      ? shop.products.reduce((s, p) => s + p.appeal, 0) / shop.products.length : 50;
+  const shopScores = activeShops.map((shop) => {
+    const avgPrice =
+      shop.products.length > 0
+        ? shop.products.reduce((s, p) => s + p.price, 0) / shop.products.length
+        : 10;
+    const avgAppeal =
+      shop.products.length > 0
+        ? shop.products.reduce((s, p) => s + p.appeal, 0) / shop.products.length
+        : 50;
     const shopRep = getShopReputation(shop);
     const exposureCoeff = getExposureCoefficient(shop.exposure);
     const reputationCoeff = getReputationCoefficient(shopRep);
@@ -329,21 +365,25 @@ export function updateShopProfits(
       shop,
       score: exposureCoeff * reputationCoeff * qualityScore * serviceScore,
       avgPrice,
-      avgCost: shop.products.length > 0
-        ? shop.products.reduce((s, p) => s + p.baseCost, 0) / shop.products.length : 5,
+      avgCost:
+        shop.products.length > 0
+          ? shop.products.reduce((s, p) => s + p.baseCost, 0) /
+            shop.products.length
+          : 5,
     };
   });
 
   const totalScore = shopScores.reduce((sum, s) => sum + s.score, 0);
 
-  return shops.map(shop => {
+  return shops.map((shop) => {
     if (shop.isClosing) return shop;
-    const entry = shopScores.find(s => s.shop.id === shop.id);
+    const entry = shopScores.find((s) => s.shop.id === shop.id);
     if (!entry) return shop;
 
     const share = totalScore > 0 ? entry.score / totalScore : 0;
     const weeklyRevenue = areaTotalDemand * share * entry.avgPrice;
-    const weeklyCost = areaTotalDemand * share * entry.avgCost + shop.monthlyRent / 4;
+    const weeklyCost =
+      areaTotalDemand * share * entry.avgCost + shop.monthlyRent / 4;
     return { ...shop, weeklyProfit: weeklyRevenue - weeklyCost };
   });
 }
