@@ -57,6 +57,20 @@ export class GameRunner {
   // ---- Action 处理 ----
 
   private handleAction(id: string, action: import('@/lib/gameActionTypes').GameAction): AgentResponse {
+    // 守卫：UI 中交互事件弹窗会阻断 next_week，CLI 同等行为通过 dispatch 拒绝。
+    if (
+      action.type === 'next_week' &&
+      this.state.pendingInteractiveEvent &&
+      this.state.gamePhase === 'operating'
+    ) {
+      return {
+        id,
+        success: false,
+        error:
+          `Pending interactive event "${this.state.pendingInteractiveEvent.name}" must be responded first ` +
+          `(use respond_to_event). Query "pending_event" to see options.`,
+      };
+    }
     const result = dispatch(this.state, action);
     if (result.error) {
       return { id, success: false, error: result.error };
@@ -91,6 +105,57 @@ export class GameRunner {
             gameResult: computeGameResult(this.state),
           },
         };
+
+      case 'pending_event': {
+        const ev = this.state.pendingInteractiveEvent;
+        if (!ev) return { id, success: true, data: null };
+        const desc = typeof ev.description === 'function' ? ev.description(this.state) : ev.description;
+        return {
+          id,
+          success: true,
+          data: {
+            id: ev.id,
+            name: ev.name,
+            description: desc,
+            category: ev.category,
+            isNotification: !!ev.notificationEffects && (ev.options || []).length === 0,
+            notificationQuote: ev.notificationQuote,
+            options: (ev.options || []).map((o) => ({
+              id: o.id,
+              text: o.text,
+              yonggeQuote: o.yonggeQuote,
+              narrativeHint: o.narrativeHint,
+              effects: o.effects,
+            })),
+          },
+        };
+      }
+
+      case 'inventory':
+        return { id, success: true, data: this.state.inventoryState };
+
+      case 'weekly_report':
+        return {
+          id,
+          success: true,
+          data: this.state.weeklySummary ?? this.state.lastWeeklySummary ?? null,
+        };
+
+      case 'nearby_shops':
+        return {
+          id,
+          success: true,
+          data: {
+            shops: this.state.nearbyShops,
+            events: this.state.nearbyShopEvents,
+          },
+        };
+
+      case 'cognition':
+        return { id, success: true, data: this.state.cognition };
+
+      case 'boss_action':
+        return { id, success: true, data: this.state.bossAction };
 
       case 'brands':
         return { id, success: true, data: brands };
@@ -148,10 +213,13 @@ export class GameRunner {
               'brands', 'locations', 'products', 'decorations',
               'staff_types', 'marketing_activities', 'delivery_platforms',
               'stats', 'supply_demand',
+              'pending_event', 'inventory', 'weekly_report',
+              'nearby_shops', 'cognition', 'boss_action',
             ],
             tips: [
               '先 query available_actions 获取当前可用操作',
               '每次 action 响应都会附带最新 state 视图',
+              '若 state.pendingInteractiveEvent 非空，必须先 respond_to_event 才能 next_week',
               'meta reset 可重新开始游戏',
             ],
           },

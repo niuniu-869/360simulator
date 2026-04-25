@@ -20,7 +20,13 @@ export type QueryType =
   | 'marketing_activities'
   | 'delivery_platforms'
   | 'stats'
-  | 'supply_demand';
+  | 'supply_demand'
+  | 'pending_event'
+  | 'inventory'
+  | 'weekly_report'
+  | 'nearby_shops'
+  | 'cognition'
+  | 'boss_action';
 
 // ============ 请求类型 ============
 
