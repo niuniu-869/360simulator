@@ -7,7 +7,7 @@
  * 而做出与 UI 玩家不同的决策。
  */
 
-import type { GameState, WeeklySummary } from '@/types/game';
+import type { GameState, WeeklySummary } from "@/types/game";
 
 // ============ 视图类型定义 ============
 
@@ -84,7 +84,12 @@ export interface AgentWeeklySummaryView {
   totalDemand: number;
   totalSupply: number;
   fulfillmentRate: number;
-  productSales: Array<{ productId: string; name: string; sales: number; revenue: number }>;
+  productSales: Array<{
+    productId: string;
+    name: string;
+    sales: number;
+    revenue: number;
+  }>;
   staffCount: number;
   avgMorale: number;
   avgFatigue: number;
@@ -93,7 +98,11 @@ export interface AgentWeeklySummaryView {
   expGained: number;
   expSources: Array<{ label: string; exp: number }>;
   event: AgentLastWeekEventView | null;
-  interactiveEventResponse: { eventId: string; optionId: string; week: number } | null;
+  interactiveEventResponse: {
+    eventId: string;
+    optionId: string;
+    week: number;
+  } | null;
   consecutiveProfits: number;
   returnOnInvestmentProgress: number;
   cognitionLevelUp: { fromLevel: number; toLevel: number } | null;
@@ -136,6 +145,8 @@ export interface AgentGameView {
   totalInvestment: number;
   cumulativeProfit: number;
   consecutiveProfits: number;
+  consecutiveLossWeeks: number;
+  crisisMode: "none" | "cash_low" | "rep_crisis" | "bankruptcy_warning";
 
   // 上一周经营数据
   weeklyRevenue: number;
@@ -189,7 +200,12 @@ export interface AgentGameView {
   };
 
   // 营销
-  activeMarketing: Array<{ id: string; name: string; activeWeeks: number; weeklyCost: number }>;
+  activeMarketing: Array<{
+    id: string;
+    name: string;
+    activeWeeks: number;
+    weeklyCost: number;
+  }>;
 
   // 外卖
   hasDelivery: boolean;
@@ -221,7 +237,12 @@ export interface AgentGameView {
   inventory: AgentInventoryItemView[];
 
   // 事件 buff
-  activeEventBuffs: Array<{ type: string; value: number; durationWeeks: number; source: string }>;
+  activeEventBuffs: Array<{
+    type: string;
+    value: number;
+    durationWeeks: number;
+    source: string;
+  }>;
   pendingDelayedEffectsCount: number;
 
   // 待响应交互事件（关键 — UI 玩家会看到弹窗）
@@ -243,7 +264,9 @@ function tail<T>(arr: T[] | undefined, n: number): T[] {
 }
 
 /** WeeklySummary → AgentWeeklySummaryView */
-function serializeWeeklySummary(s: WeeklySummary | null): AgentWeeklySummaryView | null {
+function serializeWeeklySummary(
+  s: WeeklySummary | null,
+): AgentWeeklySummaryView | null {
   if (!s) return null;
   return {
     week: s.week,
@@ -285,9 +308,13 @@ function serializeWeeklySummary(s: WeeklySummary | null): AgentWeeklySummaryView
         }
       : null,
     consecutiveProfits: s.consecutiveProfits,
-    returnOnInvestmentProgress: Math.round(s.returnOnInvestmentProgress * 100) / 100,
+    returnOnInvestmentProgress:
+      Math.round(s.returnOnInvestmentProgress * 100) / 100,
     cognitionLevelUp: s.cognitionLevelUp
-      ? { fromLevel: s.cognitionLevelUp.fromLevel, toLevel: s.cognitionLevelUp.toLevel }
+      ? {
+          fromLevel: s.cognitionLevelUp.fromLevel,
+          toLevel: s.cognitionLevelUp.toLevel,
+        }
       : null,
     cleanlinessChange: Math.round(s.cleanlinessChange * 10) / 10,
     delayedEffectNarratives: s.delayedEffectNarratives || [],
@@ -322,9 +349,9 @@ function serializeWeeklySummary(s: WeeklySummary | null): AgentWeeklySummaryView
 export function serializeState(state: GameState): AgentGameView {
   const pendingEvent = state.pendingInteractiveEvent;
   const pendingDescription =
-    typeof pendingEvent?.description === 'function'
+    typeof pendingEvent?.description === "function"
       ? pendingEvent.description(state)
-      : pendingEvent?.description ?? '';
+      : (pendingEvent?.description ?? "");
 
   return {
     phase: state.gamePhase,
@@ -337,6 +364,8 @@ export function serializeState(state: GameState): AgentGameView {
     totalInvestment: Math.round(state.totalInvestment),
     cumulativeProfit: Math.round(state.cumulativeProfit || 0),
     consecutiveProfits: state.consecutiveProfits || 0,
+    consecutiveLossWeeks: state.consecutiveLossWeeks || 0,
+    crisisMode: state.crisisMode ?? "none",
 
     weeklyRevenue: Math.round(state.weeklyRevenue ?? 0),
     weeklyVariableCost: Math.round(state.weeklyVariableCost ?? 0),
@@ -347,17 +376,33 @@ export function serializeState(state: GameState): AgentGameView {
     cashHistory: tail(state.cashHistory, 8).map((v) => Math.round(v)),
 
     brand: state.selectedBrand
-      ? { id: state.selectedBrand.id, name: state.selectedBrand.name, type: state.selectedBrand.type }
+      ? {
+          id: state.selectedBrand.id,
+          name: state.selectedBrand.name,
+          type: state.selectedBrand.type,
+        }
       : null,
     location: state.selectedLocation
-      ? { id: state.selectedLocation.id, name: state.selectedLocation.name, type: state.selectedLocation.type }
+      ? {
+          id: state.selectedLocation.id,
+          name: state.selectedLocation.name,
+          type: state.selectedLocation.type,
+        }
       : null,
     address: state.selectedAddress
-      ? { id: state.selectedAddress.id, name: state.selectedAddress.name, area: state.selectedAddress.area }
+      ? {
+          id: state.selectedAddress.id,
+          name: state.selectedAddress.name,
+          area: state.selectedAddress.area,
+        }
       : null,
     storeArea: state.storeArea,
     decoration: state.selectedDecoration
-      ? { id: state.selectedDecoration.id, name: state.selectedDecoration.name, level: state.selectedDecoration.level }
+      ? {
+          id: state.selectedDecoration.id,
+          name: state.selectedDecoration.name,
+          level: state.selectedDecoration.level,
+        }
       : null,
 
     products: state.selectedProducts.map((p) => ({
@@ -477,7 +522,9 @@ export function serializeState(state: GameState): AgentGameView {
             yonggeQuote: o.yonggeQuote,
             narrativeHint: o.narrativeHint,
           })),
-          isNotification: !!pendingEvent.notificationEffects && (pendingEvent.options || []).length === 0,
+          isNotification:
+            !!pendingEvent.notificationEffects &&
+            (pendingEvent.options || []).length === 0,
         }
       : null,
 

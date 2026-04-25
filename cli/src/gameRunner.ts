@@ -318,9 +318,12 @@ export class GameRunner {
         return {
           id,
           success: true,
-          data:
-            (this.state as unknown as { crisisMode?: string }).crisisMode ??
-            "none",
+          data: {
+            mode: this.state.crisisMode ?? "none",
+            consecutiveLossWeeks: this.state.consecutiveLossWeeks ?? 0,
+            cash: Math.round(this.state.cash),
+            weeklyFixedCost: Math.round(this.state.weeklyFixedCost ?? 0),
+          },
         };
       case "toasts":
         return {

@@ -1,0 +1,97 @@
+{
+  "phase": 3,
+  "timestamp": "2026-04-25T11:16:03.362Z",
+  "seeds": [
+    42,
+    100,
+    200,
+    300,
+    400
+  ],
+  "metrics": {
+    "avgDrama": 7,
+    "perSeed": [
+      {
+        "seed": 42,
+        "dramaMoments": 4,
+        "dramaByType": {
+          "crisis": 0,
+          "highlight": 3,
+          "turning_point": 1,
+          "bankruptcy_threat": 0
+        },
+        "weeks": 52,
+        "end": "time_limit"
+      },
+      {
+        "seed": 100,
+        "dramaMoments": 10,
+        "dramaByType": {
+          "crisis": 4,
+          "highlight": 3,
+          "turning_point": 3,
+          "bankruptcy_threat": 0
+        },
+        "weeks": 52,
+        "end": "time_limit"
+      },
+      {
+        "seed": 200,
+        "dramaMoments": 3,
+        "dramaByType": {
+          "crisis": 1,
+          "highlight": 0,
+          "turning_point": 2,
+          "bankruptcy_threat": 0
+        },
+        "weeks": 52,
+        "end": "time_limit"
+      },
+      {
+        "seed": 300,
+        "dramaMoments": 5,
+        "dramaByType": {
+          "crisis": 3,
+          "highlight": 0,
+          "turning_point": 2,
+          "bankruptcy_threat": 0
+        },
+        "weeks": 52,
+        "end": "time_limit"
+      },
+      {
+        "seed": 400,
+        "dramaMoments": 13,
+        "dramaByType": {
+          "crisis": 0,
+          "highlight": 11,
+          "turning_point": 2,
+          "bankruptcy_threat": 0
+        },
+        "weeks": 52,
+        "end": "time_limit"
+      }
+    ],
+    "debtForced": true,
+    "crisisHit": true
+  },
+  "expected": {
+    "avgDrama": ">=3"
+  },
+  "evalDetail": {
+    "avgDrama": {
+      "actual": 7,
+      "expected": ">=3",
+      "pass": true
+    },
+    "debtForced": {
+      "actual": true,
+      "pass": true
+    },
+    "crisisHit": {
+      "actual": true,
+      "pass": true
+    }
+  },
+  "pass": true
+}

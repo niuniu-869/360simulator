@@ -679,6 +679,10 @@ export interface GameState {
   currentWeek: number;
   totalWeeks: number;
   seed?: number; // 本局 RNG seed（可复现）
+  crisisMode?: "none" | "cash_low" | "rep_crisis" | "bankruptcy_warning";
+  consecutiveLossWeeks?: number; // 连亏周数（drama 触发用）
+  highlightHistory?: string[]; // 已触发的高光事件 id（去重）
+  unlockedAchievements?: string[]; // Phase 4 提前占位
   consecutiveProfits?: number; // 连续盈利周数
   gamePhase: "setup" | "operating" | "ended";
   gameOverReason?: "win" | "bankrupt" | "time_limit" | null;

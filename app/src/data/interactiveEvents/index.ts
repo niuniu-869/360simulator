@@ -11,14 +11,16 @@
  * - setupEvents.ts    — 筹备阶段事件（3 个 + 2 链式）
  */
 
-import { OPERATING_CORE_EVENTS } from './operatingCore';
-import { OPERATING_MORE_EVENTS } from './operatingMore';
-import { NEW_EVENTS } from './newEvents';
-import { SETUP_EVENTS } from './setupEvents';
+import { OPERATING_CORE_EVENTS } from "./operatingCore";
+import { OPERATING_MORE_EVENTS } from "./operatingMore";
+import { NEW_EVENTS } from "./newEvents";
+import { SETUP_EVENTS } from "./setupEvents";
+import { DRAMA_EVENTS } from "./dramaEvents";
 
 export const INTERACTIVE_EVENTS = [
   ...OPERATING_CORE_EVENTS,
   ...OPERATING_MORE_EVENTS,
   ...NEW_EVENTS,
   ...SETUP_EVENTS,
+  ...DRAMA_EVENTS,
 ];

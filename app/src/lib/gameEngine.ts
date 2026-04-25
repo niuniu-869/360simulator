@@ -81,6 +81,7 @@ import {
 } from "@/data/bossActionData";
 import type { InvestigationDimension } from "@/types/game";
 import { seedRng, rand } from "@/lib/rng";
+import { tickDrama } from "@/lib/dramaEngine";
 
 // ============ 常量 ============
 
@@ -921,9 +922,7 @@ export function weeklyTick(prev: GameState): {
 
   // 随机事件（12%概率，约每2个月一次，更接近现实）
   const event =
-    rand() > 0.88
-      ? gameEvents[Math.floor(rand() * gameEvents.length)]
-      : null;
+    rand() > 0.88 ? gameEvents[Math.floor(rand() * gameEvents.length)] : null;
 
   // 交互式事件抽取（v2.9）：上下文感知，每个事件最多触发一次
   // 注入当前周财务数据，使上下文检查（staff_cost_exceeds_revenue / low_margin）用实时值
@@ -2076,5 +2075,8 @@ export function weeklyTick(prev: GameState): {
     gameOverReason,
   };
 
-  return { state: newState, summary: weeklySummary };
+  // Phase 3: 戏剧性 — 检测危机模式 / 强制 / 翻盘 / 高光事件
+  const finalState = tickDrama(newState);
+
+  return { state: finalState, summary: weeklySummary };
 }
