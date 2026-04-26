@@ -12,6 +12,7 @@ import type {
   CognitionLevel,
   SupplyDemandResult,
   WeeklySummary,
+  WeeklyKeyDriver,
   NearbyShopEvent,
   InteractiveGameEvent,
 } from "@/types/game";
@@ -87,6 +88,11 @@ import {
   CLEANLINESS_BASE_DIRT,
   CLEANLINESS_REPUTATION_IMPACT,
 } from "@/data/balance";
+import {
+  completeMonthlyObjective,
+  createMonthlyObjective,
+  updateMonthlyObjectiveProgress,
+} from "@/lib/monthlyObjectives";
 
 // ============ 常量 ============
 
@@ -155,6 +161,151 @@ function mapLaunchProgressToAwareness(progress: number): number {
   // 0.25~1.0：低进度几乎无人知晓，高进度接近稳定期
   const normalized = sigmoid((progress - 45) / 10);
   return 0.25 + 0.75 * normalized;
+}
+
+function getWinRoute(params: {
+  week: number;
+  totalWeeks: number;
+  cumulativeProfit: number;
+  weeklyProfit: number;
+  consecutiveProfits: number;
+  exposure: number;
+  reputation: number;
+  cleanliness: number;
+  fulfillmentRate: number;
+  totalInvestment: number;
+  cognitionLevel: CognitionLevel;
+  cash: number;
+  weeklyFixedCost: number;
+}): GameState["winRoute"] {
+  const profitableNow = params.weeklyProfit > 0 && params.cumulativeProfit >= 0;
+  if (!profitableNow) return null;
+
+  if (
+    params.cumulativeProfit >= params.totalInvestment * 1.15 &&
+    params.consecutiveProfits >= WIN_STREAK + 2 &&
+    params.exposure >= Math.max(WIN_EXPOSURE, 42) &&
+    params.reputation >= Math.max(WIN_REPUTATION, 55)
+  ) {
+    return "return_on_investment";
+  }
+  if (
+    params.week >= 32 &&
+    params.cumulativeProfit >= params.totalInvestment * 0.5 &&
+    params.consecutiveProfits >= 6 &&
+    params.exposure >= 70 &&
+    params.weeklyProfit >= params.weeklyFixedCost * 0.6
+  ) {
+    return "growth";
+  }
+  if (
+    params.week >= 32 &&
+    params.cumulativeProfit >= params.totalInvestment * 0.35 &&
+    params.consecutiveProfits >= 6 &&
+    params.reputation >= 82 &&
+    params.cleanliness >= 82 &&
+    params.fulfillmentRate >= 0.9
+  ) {
+    return "reputation";
+  }
+  if (
+    params.week >= Math.min(48, params.totalWeeks) &&
+    params.cumulativeProfit >= params.totalInvestment * 0.25 &&
+    params.consecutiveProfits >= 6 &&
+    params.cognitionLevel >= 4 &&
+    params.cash >= params.weeklyFixedCost * 8
+  ) {
+    return "survival";
+  }
+
+  return null;
+}
+
+function buildWeeklyKeyDrivers(params: {
+  revenue: number;
+  variableCost: number;
+  fixedCost: number;
+  profit: number;
+  fulfillmentRate: number;
+  restockCost: number;
+  bossActionCost: number;
+  eventCostExtra: number;
+  buffCostExtra: number;
+  healthAlertsCount: number;
+}): WeeklyKeyDriver[] {
+  const drivers: WeeklyKeyDriver[] = [
+    {
+      id: "revenue",
+      label: "营业收入",
+      detail: "本周所有堂食和外卖销售带来的现金流入。",
+      impact: params.revenue,
+      polarity: "good",
+    },
+    {
+      id: "variable_cost",
+      label: "变动成本",
+      detail: "原材料、损耗、外卖佣金和包装等随销量变化的成本。",
+      impact: -params.variableCost,
+      polarity: "bad",
+    },
+    {
+      id: "fixed_cost",
+      label: "固定成本",
+      detail: "租金、人工、折旧和基础营销等本周必须承担的费用。",
+      impact: -params.fixedCost,
+      polarity: "bad",
+    },
+  ];
+
+  if (params.fulfillmentRate < 0.85) {
+    drivers.push({
+      id: "fulfillment_loss",
+      label: "履约损失",
+      detail: "需求没有被充分满足，部分顾客空手而归。",
+      impact: -Math.round(params.revenue * (1 - params.fulfillmentRate) * 0.6),
+      polarity: "bad",
+    });
+  }
+  if (params.restockCost > Math.max(3000, params.revenue * 0.35)) {
+    drivers.push({
+      id: "restock_pressure",
+      label: "补货占用现金",
+      detail: "补货是资产转换，不直接算亏损，但会压低现金缓冲。",
+      impact: -params.restockCost,
+      polarity: "neutral",
+    });
+  }
+  if (params.bossActionCost > 0) {
+    drivers.push({
+      id: "boss_action_cost",
+      label: "老板行动费用",
+      detail: "本周老板外出行动产生了额外支出。",
+      impact: -params.bossActionCost,
+      polarity: "bad",
+    });
+  }
+  if (params.eventCostExtra + params.buffCostExtra > 0) {
+    drivers.push({
+      id: "temporary_cost",
+      label: "临时事件成本",
+      detail: "事件或临时状态抬高了本周成本。",
+      impact: -(params.eventCostExtra + params.buffCostExtra),
+      polarity: "bad",
+    });
+  }
+  if (params.healthAlertsCount > 0) {
+    drivers.push({
+      id: "health_alerts",
+      label: "经营告警",
+      detail: `${params.healthAlertsCount} 条健康告警需要处理，否则会继续拖累后续月份。`,
+      impact: 0,
+      polarity: "neutral",
+    });
+  }
+
+  return drivers
+    .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+    .slice(0, 4);
 }
 
 /** 获取有效供货成本系数（快招品牌蜜月期内返回1.0，蜜月期后返回真实值；叠加饭局 buff） */
@@ -415,6 +566,7 @@ export function createInitialGameState(seed?: number): GameState {
     consecutiveProfits: 0,
     gamePhase: "setup",
     gameOverReason: null,
+    winRoute: null,
     selectedBrand: null,
     selectedLocation: null,
     selectedAddress: null,
@@ -526,6 +678,8 @@ export function createInitialGameState(seed?: number): GameState {
     pendingDelayedEffects: [],
     pendingChainEvents: [],
     // 每周总结与回本追踪
+    monthlyObjective: null,
+    lastMonthlyObjectiveResult: null,
     weeklySummary: null,
     lastWeeklySummary: null,
     cumulativeProfit: 0,
@@ -1308,15 +1462,12 @@ export function weeklyTick(prev: GameState): {
   newCognition.consultYongGeThisWeek = 0;
   newCognition.mistakeHistory = newMistakeHistory;
 
-  // ============ 胜利判定（回本 + 连续盈利） ============
-  const newCumulativeProfit = (prev.cumulativeProfit || 0) + finalProfit;
-  const meetsReturnRequirement = newCumulativeProfit >= prev.totalInvestment;
-  const meetsStreakRequirement = newConsecutiveProfits >= WIN_STREAK;
-  const meetsBrandRequirement =
-    newExposure >= WIN_EXPOSURE && newReputation >= WIN_REPUTATION;
+  // ============ 胜利判定（最终利润调整后会重算） ============
+  let newCumulativeProfit = (prev.cumulativeProfit || 0) + finalProfit;
+  let finalConsecutiveProfits = newConsecutiveProfits;
+  let winRoute: GameState["winRoute"] = null;
   const reachedTimeLimit = prev.totalWeeks > 0 && newWeek >= prev.totalWeeks;
-  const isWin =
-    meetsReturnRequirement && meetsStreakRequirement && meetsBrandRequirement;
+  let isWin = false;
 
   // 计算本周结余（补货成本在 return 前扣除）
   const newCash = prevWithEffects.cash + finalProfit;
@@ -1620,6 +1771,25 @@ export function weeklyTick(prev: GameState): {
   // 反映现实：老板不可能长期欠员工工资或半个月房租仍继续经营
   const dynamicMinCash = calculateMinOperatingCash(updatedState);
   const finalIsBankrupt = finalCash < dynamicMinCash;
+  finalConsecutiveProfits =
+    finalProfit > 0 ? (prev.consecutiveProfits || 0) + 1 : 0;
+  newCumulativeProfit = (prev.cumulativeProfit || 0) + finalProfit;
+  winRoute = getWinRoute({
+    week: newWeek,
+    totalWeeks: prev.totalWeeks,
+    cumulativeProfit: newCumulativeProfit,
+    weeklyProfit: finalProfit,
+    consecutiveProfits: finalConsecutiveProfits,
+    exposure: newExposure,
+    reputation: newReputation,
+    cleanliness: newCleanliness,
+    fulfillmentRate: avgFulfillment,
+    totalInvestment: prev.totalInvestment,
+    cognitionLevel: newCognition.level,
+    cash: finalCash,
+    weeklyFixedCost: fixedCost,
+  });
+  isWin = !!winRoute;
 
   // ============ 计算员工忙碌度统计 ============
   // 使用包含外卖的总需求，员工出餐同时服务堂食和外卖
@@ -1748,9 +1918,22 @@ export function weeklyTick(prev: GameState): {
     tempStats,
     supplyDemandResult,
   );
+  const keyDrivers = buildWeeklyKeyDrivers({
+    revenue: finalRevenue,
+    variableCost,
+    fixedCost: totalFixedAndExtra,
+    profit: finalProfit,
+    fulfillmentRate: avgFulfillment,
+    restockCost: weeklyRestockCost,
+    bossActionCost,
+    eventCostExtra,
+    buffCostExtra,
+    healthAlertsCount: healthAlerts.length,
+  });
+  let effectiveCognitionLevelUp = cognitionLevelUp;
 
   // ============ 生成每周总结数据 ============
-  const weeklySummary: WeeklySummary = {
+  let weeklySummary: WeeklySummary = {
     week: newWeek,
     revenue: finalRevenue,
     variableCost,
@@ -1784,7 +1967,10 @@ export function weeklyTick(prev: GameState): {
     expSources,
     event,
     interactiveEventResponse: prev.lastInteractiveEventResponse,
-    consecutiveProfits: newConsecutiveProfits,
+    keyDrivers,
+    monthlyObjective: prev.monthlyObjective,
+    monthlyObjectiveResult: null,
+    consecutiveProfits: finalConsecutiveProfits,
     returnOnInvestmentProgress:
       prev.totalInvestment > 0
         ? (newCumulativeProfit / prev.totalInvestment) * 100
@@ -1794,10 +1980,88 @@ export function weeklyTick(prev: GameState): {
     delayedEffectNarratives,
     activeBuffSummaries,
     staffWorkStats,
-    cognitionLevelUp,
+    cognitionLevelUp: effectiveCognitionLevelUp,
     restockCost: weeklyRestockCost,
     bossActionCost,
   };
+
+  // ============ 月经营目标：进度更新 / 月末结算 / 下月目标 ============
+  let nextMonthlyObjective = updateMonthlyObjectiveProgress(
+    prev.monthlyObjective,
+    {
+      ...updatedState,
+      currentWeek: newWeek,
+      cash: finalCash,
+      exposure: newExposure,
+      reputation: newReputation,
+    },
+    weeklySummary,
+  );
+  let lastMonthlyObjectiveResult = prev.lastMonthlyObjectiveResult;
+  if (
+    nextMonthlyObjective &&
+    nextMonthlyObjective.status === "active" &&
+    newWeek >= nextMonthlyObjective.endWeek
+  ) {
+    const completed = completeMonthlyObjective(nextMonthlyObjective, newWeek);
+    nextMonthlyObjective = completed.objective;
+    lastMonthlyObjectiveResult = completed.result;
+
+    if (completed.result.success) {
+      const reward = completed.result.reward;
+      finalCash += reward.cash ?? 0;
+      newExposure = clamp(newExposure + (reward.exposure ?? 0), 0, 100);
+      newReputation = clamp(newReputation + (reward.reputation ?? 0), 0, 100);
+      if (reward.cognitionExp && reward.cognitionExp > 0) {
+        const beforeRewardLevel = newCognition.level;
+        newCognition = applyCognitionExp(newCognition, reward.cognitionExp);
+        effectiveCognitionLevelUp =
+          effectiveCognitionLevelUp ??
+          (newCognition.level > beforeRewardLevel
+            ? { fromLevel: beforeRewardLevel, toLevel: newCognition.level }
+            : null);
+        weeklySummary = {
+          ...weeklySummary,
+          expGained: weeklySummary.expGained + reward.cognitionExp,
+          expSources: [
+            ...weeklySummary.expSources,
+            { label: `完成月目标：${completed.result.title}`, exp: reward.cognitionExp },
+          ],
+          cognitionLevel: newCognition.level,
+          cognitionLevelUp: effectiveCognitionLevelUp,
+        };
+      }
+    }
+
+    weeklySummary = {
+      ...weeklySummary,
+      cashRemaining: finalCash,
+      monthlyObjective: completed.objective,
+      monthlyObjectiveResult: completed.result,
+    };
+
+    if (!finalIsBankrupt && !isWin && !reachedTimeLimit) {
+      nextMonthlyObjective = createMonthlyObjective(
+        {
+          ...updatedState,
+          currentWeek: newWeek,
+          cash: finalCash,
+          exposure: newExposure,
+          reputation: newReputation,
+          cumulativeProfit: newCumulativeProfit,
+          lastWeekFulfillment: avgFulfillment,
+          weeklyRevenue: finalRevenue,
+          weeklyFixedCost: fixedCost,
+        },
+        newWeek + 1,
+      );
+    }
+  } else if (nextMonthlyObjective) {
+    weeklySummary = {
+      ...weeklySummary,
+      monthlyObjective: nextMonthlyObjective,
+    };
+  }
 
   const gameOverReason: GameState["gameOverReason"] = finalIsBankrupt
     ? "bankrupt"
@@ -2023,7 +2287,7 @@ export function weeklyTick(prev: GameState): {
   const newState: GameState = {
     ...updatedState,
     currentWeek: newWeek,
-    consecutiveProfits: newConsecutiveProfits,
+    consecutiveProfits: finalConsecutiveProfits,
     cash: finalCash,
     weeklyRevenue: finalRevenue,
     weeklyVariableCost: variableCost,
@@ -2033,6 +2297,7 @@ export function weeklyTick(prev: GameState): {
     cashHistory: [...prev.cashHistory, finalCash],
     gamePhase:
       finalIsBankrupt || isWin || reachedTimeLimit ? "ended" : "operating",
+    winRoute,
     // 认知系统状态
     cognition: newCognition,
     // 老板周行动
@@ -2083,6 +2348,8 @@ export function weeklyTick(prev: GameState): {
     })(),
     lastInteractiveEventResponse: null, // 清空上周响应，等玩家本周响应后填入
     // 每周总结与回本追踪
+    monthlyObjective: nextMonthlyObjective,
+    lastMonthlyObjectiveResult,
     weeklySummary,
     cumulativeProfit: newCumulativeProfit,
     gameOverReason,

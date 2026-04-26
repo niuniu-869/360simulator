@@ -63,6 +63,62 @@ export interface HealthAlert {
     | "delivery";
 }
 
+export type WinRoute =
+  | "return_on_investment"
+  | "growth"
+  | "reputation"
+  | "survival";
+
+export type MonthlyObjectiveMetric =
+  | "monthly_profit"
+  | "monthly_revenue"
+  | "avg_fulfillment"
+  | "exposure"
+  | "reputation"
+  | "cash_buffer";
+
+export interface MonthlyObjectiveReward {
+  cash?: number;
+  reputation?: number;
+  exposure?: number;
+  cognitionExp?: number;
+}
+
+export interface MonthlyObjective {
+  id: string;
+  title: string;
+  description: string;
+  focus: "finance" | "growth" | "reputation" | "supply" | "survival";
+  metric: MonthlyObjectiveMetric;
+  startWeek: number;
+  endWeek: number;
+  targetValue: number;
+  currentValue: number;
+  baselineValue?: number;
+  accumulatedValue: number;
+  weeksMeasured: number;
+  unit: "money" | "percent" | "score";
+  reward: MonthlyObjectiveReward;
+  status: "active" | "completed" | "failed";
+}
+
+export interface MonthlyObjectiveResult {
+  objectiveId: string;
+  title: string;
+  success: boolean;
+  summary: string;
+  reward: MonthlyObjectiveReward;
+  completedAtWeek: number;
+}
+
+export interface WeeklyKeyDriver {
+  id: string;
+  label: string;
+  detail: string;
+  impact: number;
+  polarity: "good" | "bad" | "neutral";
+}
+
 // 每周总结数据
 export interface WeeklySummary {
   week: number;
@@ -91,6 +147,9 @@ export interface WeeklySummary {
   expSources: { label: string; exp: number }[];
   event: GameEvent | null;
   interactiveEventResponse: InteractiveEventResponse | null; // 交互事件响应（v2.9）
+  keyDrivers: WeeklyKeyDriver[];
+  monthlyObjective: MonthlyObjective | null;
+  monthlyObjectiveResult: MonthlyObjectiveResult | null;
   consecutiveProfits: number;
   returnOnInvestmentProgress: number; // 累计利润/总投资 百分比
   healthAlerts: HealthAlert[]; // 经营健康诊断告警
@@ -686,6 +745,7 @@ export interface GameState {
   consecutiveProfits?: number; // 连续盈利周数
   gamePhase: "setup" | "operating" | "ended";
   gameOverReason?: "win" | "bankrupt" | "time_limit" | null;
+  winRoute?: WinRoute | null;
 
   // 决策状态
   selectedBrand: Brand | null;
@@ -789,6 +849,8 @@ export interface GameState {
   }>;
 
   // ============ 每周总结与回本追踪 ============
+  monthlyObjective: MonthlyObjective | null; // 当前月经营目标
+  lastMonthlyObjectiveResult: MonthlyObjectiveResult | null; // 最近一次月目标结算
   weeklySummary: WeeklySummary | null; // 上周总结（弹窗展示后清空）
   lastWeeklySummary: WeeklySummary | null; // 上周总结存档（用于"回顾"按钮）
   cumulativeProfit: number; // 累计利润（用于回本判定）

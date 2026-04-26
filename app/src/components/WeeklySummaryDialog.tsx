@@ -40,6 +40,11 @@ export function WeeklySummaryDialog({ summary, cognitionLevel, onClose, onOpenCy
   const fuzzPercent = (value: number) => fuzzWeeklySummaryValue(value, cognitionLevel, 'percent');
 
   const isProfitable = summary.profit > 0;
+  const formatImpact = (value: number) => {
+    if (value === 0) return '影响待观察';
+    const sign = value > 0 ? '+' : '-';
+    return `${sign}${formatMoney(Math.abs(value))}`;
+  };
 
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
@@ -68,6 +73,75 @@ export function WeeklySummaryDialog({ summary, cognitionLevel, onClose, onOpenCy
               连续盈利 {summary.consecutiveProfits}/{WIN_STREAK} 周
             </p>
           </div>
+
+          {/* 月经营目标 */}
+          {summary.monthlyObjective && (
+            <div className="bg-blue-500/10 p-4 border border-blue-500/30">
+              <h4 className="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-400" />
+                月经营目标：{summary.monthlyObjective.title}
+              </h4>
+              <p className="text-xs text-slate-300 mb-3">{summary.monthlyObjective.description}</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>进度</span>
+                  <span>
+                    {summary.monthlyObjective.unit === 'money'
+                      ? `${formatMoney(summary.monthlyObjective.currentValue)} / ${formatMoney(summary.monthlyObjective.targetValue)}`
+                      : summary.monthlyObjective.unit === 'percent'
+                        ? `${Math.round(summary.monthlyObjective.currentValue * 100)}% / ${Math.round(summary.monthlyObjective.targetValue * 100)}%`
+                        : `${Math.round(summary.monthlyObjective.currentValue)} / ${Math.round(summary.monthlyObjective.targetValue)}`}
+                  </span>
+                </div>
+                <Progress
+                  value={Math.min(100, Math.max(0, (summary.monthlyObjective.currentValue / Math.max(1, summary.monthlyObjective.targetValue)) * 100))}
+                  className="h-2"
+                />
+                <div className="text-xs text-slate-500">
+                  第 {summary.monthlyObjective.startWeek}-{summary.monthlyObjective.endWeek} 周
+                </div>
+              </div>
+              {summary.monthlyObjectiveResult && (
+                <div className={`mt-3 p-2 border text-xs ${
+                  summary.monthlyObjectiveResult.success
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                }`}>
+                  {summary.monthlyObjectiveResult.success ? '目标达成' : '目标未达成'}：
+                  {summary.monthlyObjectiveResult.summary}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 本周关键归因 */}
+          {summary.keyDrivers && summary.keyDrivers.length > 0 && (
+            <div className="bg-[#0a0e17] p-4 border border-[#1e293b]">
+              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                <Flame className="w-4 h-4 text-orange-500" />
+                本周关键归因
+              </h4>
+              <div className="space-y-2">
+                {summary.keyDrivers.map(driver => (
+                  <div key={driver.id} className="flex items-start justify-between gap-3 text-xs">
+                    <div>
+                      <p className="text-slate-300 font-medium">{driver.label}</p>
+                      <p className="text-slate-500 mt-0.5">{driver.detail}</p>
+                    </div>
+                    <span className={`font-mono shrink-0 ${
+                      driver.polarity === 'good'
+                        ? 'text-emerald-400'
+                        : driver.polarity === 'bad'
+                          ? 'text-red-400'
+                          : 'text-slate-400'
+                    }`}>
+                      {formatImpact(driver.impact)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 财务数据 */}
           <div className="bg-[#0a0e17] p-4 border border-[#1e293b]">

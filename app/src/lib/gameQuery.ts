@@ -54,6 +54,7 @@ export interface CurrentStats {
 export interface GameResult {
   isWin: boolean;
   reason: "win" | "bankrupt" | "time_limit";
+  winRoute: GameState["winRoute"];
   totalProfit: number;
   totalInvestment: number;
   roi: number;
@@ -61,6 +62,7 @@ export interface GameResult {
   meetsStreakRequirement: boolean;
   meetsReturnRequirement: boolean;
   meetsBrandRequirement: boolean;
+  isNonLosing: boolean;
 }
 
 // ============ 辅助函数 ============
@@ -224,6 +226,7 @@ export function computeGameResult(state: GameState): GameResult | null {
   const meetsStreakRequirement = (state.consecutiveProfits || 0) >= WIN_STREAK;
   const meetsBrandRequirement =
     state.exposure >= WIN_EXPOSURE && state.reputation >= WIN_REPUTATION;
+  const isNonLosing = totalProfit >= 0 && (state.weeklySummary?.profit ?? 0) >= 0;
   const reason = (state.gameOverReason || "time_limit") as
     | "win"
     | "bankrupt"
@@ -233,6 +236,7 @@ export function computeGameResult(state: GameState): GameResult | null {
   return {
     isWin,
     reason,
+    winRoute: state.winRoute ?? null,
     totalProfit,
     totalInvestment: state.totalInvestment,
     roi:
@@ -243,6 +247,7 @@ export function computeGameResult(state: GameState): GameResult | null {
     meetsStreakRequirement,
     meetsReturnRequirement,
     meetsBrandRequirement,
+    isNonLosing,
   };
 }
 

@@ -31,6 +31,9 @@ const rl = readline.createInterface({
   output: process.stdout,
   terminal: false,
 });
+process.stdin.resume();
+// Node 25 下子进程管道在首条输入前不会稳定保活，显式绑定到 stdin 生命周期。
+const keepAlive = setInterval(() => undefined, 2 ** 31 - 1);
 
 /** 向 stdout 写入一行 JSON */
 function send(obj: unknown): void {
@@ -60,5 +63,6 @@ rl.on("line", (line: string) => {
 });
 
 rl.on("close", () => {
+  clearInterval(keepAlive);
   process.exit(0);
 });

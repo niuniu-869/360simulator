@@ -71,6 +71,7 @@ import {
   TRANSITION_CONFIG,
 } from "@/data/staffData";
 import { getBossActionConfig } from "@/data/bossActionData";
+import { createMonthlyObjective } from "@/lib/monthlyObjectives";
 
 // ============ 辅助函数 ============
 
@@ -1009,7 +1010,7 @@ function handleOpenStore(prev: GameState, season?: Season): ActionResult {
     );
   }
 
-  return ok({
+  const openedState: GameState = {
     ...prev,
     isOpen: true,
     gamePhase: "operating",
@@ -1025,6 +1026,11 @@ function handleOpenStore(prev: GameState, season?: Season): ActionResult {
       weeklyWasteCost: 0,
       weeklyRestockCost: restockCost,
     },
+  };
+
+  return ok({
+    ...openedState,
+    monthlyObjective: createMonthlyObjective(openedState, 1),
   });
 }
 

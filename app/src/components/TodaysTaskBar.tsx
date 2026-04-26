@@ -14,7 +14,7 @@
 
 import { useMemo } from 'react';
 import type { GameState } from '@/types/game';
-import { AlertTriangle, BellRing, Package, Users, Megaphone, Skull } from 'lucide-react';
+import { AlertTriangle, BellRing, Package, Users, Megaphone, Skull, Target } from 'lucide-react';
 
 interface TaskItem {
   id: string;
@@ -35,6 +35,22 @@ export function TodaysTaskBar({ gameState, onJumpTab }: TodaysTaskBarProps) {
   const tasks = useMemo<TaskItem[]>(() => {
     const list: TaskItem[] = [];
     if (gameState.gamePhase !== 'operating') return list;
+
+    if (gameState.monthlyObjective) {
+      const obj = gameState.monthlyObjective;
+      const progress = obj.unit === 'money'
+        ? `¥${Math.round(obj.currentValue).toLocaleString()} / ¥${Math.round(obj.targetValue).toLocaleString()}`
+        : obj.unit === 'percent'
+          ? `${Math.round(obj.currentValue * 100)}% / ${Math.round(obj.targetValue * 100)}%`
+          : `${Math.round(obj.currentValue)} / ${Math.round(obj.targetValue)}`;
+      list.push({
+        id: 'monthly_objective',
+        severity: 'info',
+        icon: Target,
+        text: `月目标：${obj.title}`,
+        detail: `${progress}，第 ${obj.startWeek}-${obj.endWeek} 周`,
+      });
+    }
 
     if (gameState.pendingInteractiveEvent) {
       list.push({

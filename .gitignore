@@ -37,6 +37,7 @@ Thumbs.db
 
 # AI assistant context (local only)
 .claude/
+.codex
 CLAUDE.md
 
 # Spec workflow (local only)
@@ -44,6 +45,7 @@ CLAUDE.md
 
 # CLI output
 cli/output/
+cli/agent-tests/reports/*.json
 
 # Temp & cache
 .tmp/

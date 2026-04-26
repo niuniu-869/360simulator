@@ -19,7 +19,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,7 +31,11 @@ export const REPORTS_DIR = resolve(__dirname, 'reports');
 export class CliClient {
   constructor(opts = {}) {
     const { silent = true } = opts;
-    this.proc = spawn('npx', ['tsx', 'src/main.ts'], {
+    const distEntry = resolve(CLI_ROOT, 'dist/main.js');
+    const hasBuiltCli = existsSync(distEntry);
+    const command = hasBuiltCli ? process.execPath : 'npx';
+    const args = hasBuiltCli ? [distEntry] : ['tsx', 'src/main.ts'];
+    this.proc = spawn(command, args, {
       cwd: CLI_ROOT,
       stdio: ['pipe', 'pipe', 'pipe'],
     });

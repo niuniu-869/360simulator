@@ -7,7 +7,7 @@
  * 而做出与 UI 玩家不同的决策。
  */
 
-import type { GameState, WeeklySummary } from "@/types/game";
+import type { GameState, MonthlyObjective, WeeklySummary } from "@/types/game";
 
 // ============ 视图类型定义 ============
 
@@ -103,6 +103,15 @@ export interface AgentWeeklySummaryView {
     optionId: string;
     week: number;
   } | null;
+  keyDrivers: Array<{
+    id: string;
+    label: string;
+    detail: string;
+    impact: number;
+    polarity: string;
+  }>;
+  monthlyObjective: MonthlyObjective | null;
+  monthlyObjectiveResult: WeeklySummary["monthlyObjectiveResult"];
   consecutiveProfits: number;
   returnOnInvestmentProgress: number;
   cognitionLevelUp: { fromLevel: number; toLevel: number } | null;
@@ -137,6 +146,7 @@ export interface AgentWeeklySummaryView {
 export interface AgentGameView {
   phase: string;
   gameOverReason?: string | null;
+  winRoute?: string | null;
   week: number;
   totalWeeks: number;
   season: string | null;
@@ -147,6 +157,8 @@ export interface AgentGameView {
   consecutiveProfits: number;
   consecutiveLossWeeks: number;
   crisisMode: "none" | "cash_low" | "rep_crisis" | "bankruptcy_warning";
+  monthlyObjective: MonthlyObjective | null;
+  lastMonthlyObjectiveResult: GameState["lastMonthlyObjectiveResult"];
 
   // 上一周经营数据
   weeklyRevenue: number;
@@ -307,6 +319,15 @@ function serializeWeeklySummary(
           week: s.interactiveEventResponse.week,
         }
       : null,
+    keyDrivers: (s.keyDrivers || []).map((d) => ({
+      id: d.id,
+      label: d.label,
+      detail: d.detail,
+      impact: Math.round(d.impact),
+      polarity: d.polarity,
+    })),
+    monthlyObjective: s.monthlyObjective,
+    monthlyObjectiveResult: s.monthlyObjectiveResult,
     consecutiveProfits: s.consecutiveProfits,
     returnOnInvestmentProgress:
       Math.round(s.returnOnInvestmentProgress * 100) / 100,
@@ -356,6 +377,7 @@ export function serializeState(state: GameState): AgentGameView {
   return {
     phase: state.gamePhase,
     gameOverReason: state.gameOverReason ?? null,
+    winRoute: state.winRoute ?? null,
     week: state.currentWeek,
     totalWeeks: state.totalWeeks,
     season: state.currentSeason ?? null,
@@ -366,6 +388,8 @@ export function serializeState(state: GameState): AgentGameView {
     consecutiveProfits: state.consecutiveProfits || 0,
     consecutiveLossWeeks: state.consecutiveLossWeeks || 0,
     crisisMode: state.crisisMode ?? "none",
+    monthlyObjective: state.monthlyObjective,
+    lastMonthlyObjectiveResult: state.lastMonthlyObjectiveResult,
 
     weeklyRevenue: Math.round(state.weeklyRevenue ?? 0),
     weeklyVariableCost: Math.round(state.weeklyVariableCost ?? 0),

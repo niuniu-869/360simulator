@@ -8,6 +8,7 @@ interface GameResultProps {
   result: {
     isWin: boolean;
     reason: 'win' | 'bankrupt' | 'time_limit';
+    winRoute?: GameState['winRoute'];
     totalProfit: number;
     totalInvestment: number;
     roi: number;
@@ -15,6 +16,7 @@ interface GameResultProps {
     meetsStreakRequirement?: boolean;
     meetsReturnRequirement?: boolean;
     meetsBrandRequirement?: boolean;
+    isNonLosing?: boolean;
   } | null;
   onRestart: () => void;
 }
@@ -29,6 +31,12 @@ export function GameResult({ gameState, result, onRestart }: GameResultProps) {
   };
 
   if (!result) return null;
+  const routeLabel: Record<NonNullable<GameState['winRoute']>, string> = {
+    return_on_investment: '回本胜利',
+    growth: '增长胜利',
+    reputation: '口碑胜利',
+    survival: '生存胜利',
+  };
 
   // 分析踩坑情况
   const encounteredPitfalls: string[] = [];
@@ -84,7 +92,7 @@ export function GameResult({ gameState, result, onRestart }: GameResultProps) {
         
         <p className="text-slate-400 mb-6">
           {result.isWin
-            ? '达成胜利条件：回本 + 连续6周盈利 + 知名度/口碑达标。你已经摸到餐饮经营的门道了！'
+            ? `达成${result.winRoute ? routeLabel[result.winRoute] : '胜利'}：所有胜利路线都要求当前不赔钱，说明这不是烧钱换来的虚假繁荣。`
             : result.reason === 'bankrupt'
               ? '现金流断裂触发破产。先把店“活下去”，再谈扩张和营销。'
               : result.meetsStreakRequirement && !result.meetsReturnRequirement
