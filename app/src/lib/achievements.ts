@@ -301,18 +301,20 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: "scenario_zhinanguozhi",
     name: "剧本：脚盆果汁",
-    description: "完成脚盆果汁剧本",
+    description: "在「脚盆果汁：蜜雪对面」剧本中打到胜利",
     category: "scenario",
     hidden: true,
-    test: () => false,
+    test: (s) =>
+      s.gameOverReason === "win" && s.scenarioId === "scen_zhinanguozhi",
   },
   {
     id: "scenario_baiwan",
     name: "剧本：百万奶茶",
-    description: "完成百万奶茶大厦剧本",
+    description: "在「百万奶茶大厦」剧本中打到胜利",
     category: "scenario",
     hidden: true,
-    test: () => false,
+    test: (s) =>
+      s.gameOverReason === "win" && s.scenarioId === "scen_baiwanshenglou",
   },
 ];
 

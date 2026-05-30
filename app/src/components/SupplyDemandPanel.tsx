@@ -503,13 +503,13 @@ function DeliveryDetailCard({ gameState }: { gameState: GameState }) {
               </div>
               <Progress value={(weightTotal / 90) * 100} className="h-2" />
 
-              {/* 权重分构成 */}
-              <div className="grid grid-cols-5 gap-1 text-xs text-center">
+              {/* 权重分构成：窄屏降为 2 列卡片，md 起恢复 5 列 */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-1 text-xs text-center">
                 {weightItems.map(item => (
                   <div key={item.label}>
                     <div className={`h-1 rounded mb-1 ${item.color}`} style={{ opacity: item.value > 0 ? 1 : 0.2 }} />
                     <div className="font-mono">{item.value > 0 ? `+${item.value.toFixed(0)}` : '0'}</div>
-                    <div className="text-muted-foreground text-[10px]">{item.label}</div>
+                    <div className="text-muted-foreground text-xs md:text-[10px]">{item.label}</div>
                   </div>
                 ))}
               </div>
@@ -588,10 +588,10 @@ function ProductSalesCard({ productSales }: { productSales: SupplyDemandResult['
                   {getBottleneckBadge(sale.bottleneck)}
                 </div>
 
-                {/* 双通道表格 */}
+                {/* 双通道：窄屏卡片式（标签:值 网格），md 起恢复 5 列表格 */}
                 <div className="text-xs">
-                  {/* 表头 */}
-                  <div className="grid grid-cols-5 gap-1 text-muted-foreground mb-1 text-center">
+                  {/* 表头：仅 md 起显示 */}
+                  <div className="hidden md:grid grid-cols-5 gap-1 text-muted-foreground mb-1 text-center">
                     <div className="text-left">通道</div>
                     <div>需求</div>
                     <div>供给</div>
@@ -600,32 +600,38 @@ function ProductSalesCard({ productSales }: { productSales: SupplyDemandResult['
                   </div>
 
                   {/* 堂食行 */}
-                  <div className="grid grid-cols-5 gap-1 text-center py-0.5">
-                    <div className="text-left text-emerald-400">堂食</div>
-                    <div className="font-mono">{sale.dineInDemand}</div>
-                    <div className="text-slate-600">-</div>
-                    <div className="font-mono">{sale.dineInSales}</div>
-                    <div className="font-mono">{formatMoney(sale.dineInRevenue)}</div>
+                  <div className="rounded border border-[#1e293b] p-2 mb-2 md:border-0 md:rounded-none md:p-0 md:mb-0 md:grid md:grid-cols-5 md:gap-1 md:text-center md:py-0.5">
+                    <div className="text-emerald-400 font-medium md:text-left mb-1 md:mb-0">堂食</div>
+                    <div className="grid grid-cols-2 gap-1 md:contents">
+                      <div className="font-mono"><span className="text-muted-foreground md:hidden">需求 </span>{sale.dineInDemand}</div>
+                      <div className="md:text-slate-600"><span className="text-muted-foreground md:hidden">供给 </span><span className="text-slate-600">-</span></div>
+                      <div className="font-mono"><span className="text-muted-foreground md:hidden">销量 </span>{sale.dineInSales}</div>
+                      <div className="font-mono"><span className="text-muted-foreground md:hidden">收入 </span>{formatMoney(sale.dineInRevenue)}</div>
+                    </div>
                   </div>
 
                   {/* 外卖行 */}
                   {hasDelivery && (
-                    <div className="grid grid-cols-5 gap-1 text-center py-0.5">
-                      <div className="text-left text-orange-400">外卖</div>
-                      <div className="font-mono">{sale.deliveryDemand}</div>
-                      <div className="text-slate-600">-</div>
-                      <div className="font-mono">{sale.deliverySales}</div>
-                      <div className="font-mono">{formatMoney(sale.deliveryRevenue)}</div>
+                    <div className="rounded border border-[#1e293b] p-2 mb-2 md:border-0 md:rounded-none md:p-0 md:mb-0 md:grid md:grid-cols-5 md:gap-1 md:text-center md:py-0.5">
+                      <div className="text-orange-400 font-medium md:text-left mb-1 md:mb-0">外卖</div>
+                      <div className="grid grid-cols-2 gap-1 md:contents">
+                        <div className="font-mono"><span className="text-muted-foreground md:hidden">需求 </span>{sale.deliveryDemand}</div>
+                        <div className="md:text-slate-600"><span className="text-muted-foreground md:hidden">供给 </span><span className="text-slate-600">-</span></div>
+                        <div className="font-mono"><span className="text-muted-foreground md:hidden">销量 </span>{sale.deliverySales}</div>
+                        <div className="font-mono"><span className="text-muted-foreground md:hidden">收入 </span>{formatMoney(sale.deliveryRevenue)}</div>
+                      </div>
                     </div>
                   )}
 
                   {/* 合计行 */}
-                  <div className="grid grid-cols-5 gap-1 text-center py-0.5 border-t border-[#1e293b] font-medium">
-                    <div className="text-left">合计</div>
-                    <div className="font-mono text-blue-400">{sale.demand}</div>
-                    <div className="font-mono text-purple-400">{sale.supply}</div>
-                    <div className="font-mono text-green-400">{sale.actualSales}</div>
-                    <div className="font-mono text-white">{formatMoney(sale.revenue)}</div>
+                  <div className="rounded border border-[#1e293b] p-2 font-medium md:border-0 md:border-t md:rounded-none md:p-0 md:grid md:grid-cols-5 md:gap-1 md:text-center md:py-0.5">
+                    <div className="md:text-left mb-1 md:mb-0">合计</div>
+                    <div className="grid grid-cols-2 gap-1 md:contents">
+                      <div className="font-mono text-blue-400"><span className="text-muted-foreground md:hidden">需求 </span>{sale.demand}</div>
+                      <div className="font-mono text-purple-400"><span className="text-muted-foreground md:hidden">供给 </span>{sale.supply}</div>
+                      <div className="font-mono text-green-400"><span className="text-muted-foreground md:hidden">销量 </span>{sale.actualSales}</div>
+                      <div className="font-mono text-white"><span className="text-muted-foreground md:hidden">收入 </span>{formatMoney(sale.revenue)}</div>
+                    </div>
                   </div>
                 </div>
 

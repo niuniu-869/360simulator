@@ -37,7 +37,7 @@ export function StreetViewScene({ gameState, supplyDemandResult }: StreetViewSce
   }, [area]);
 
   return (
-    <div className="ark-card overflow-hidden" style={{ height: 420 }}>
+    <div className="ark-card overflow-hidden h-auto md:h-[420px]">
       {/* 天空层 - 确保粒子可见 */}
       <SkyLayer
         solarTerm={solarTerm}
@@ -45,16 +45,15 @@ export function StreetViewScene({ gameState, supplyDemandResult }: StreetViewSce
         totalWeeks={gameState.totalWeeks}
       />
 
-      {/* 双面板布局 */}
+      {/* 双面板布局：窄屏上下堆叠，md 起左右并排 */}
       <div
-        className="relative flex gap-4 p-4"
+        className="relative flex flex-col md:flex-row gap-4 p-4 md:h-[340px]"
         style={{
-          height: 340,
           background: 'linear-gradient(180deg, rgba(12,18,32,0.95) 0%, rgba(10,14,23,0.98) 100%)',
         }}
       >
-        {/* 左侧：店铺视图（放大） */}
-        <div className="flex-1 flex items-center justify-center relative">
+        {/* 左侧：店铺视图（放大）；窄屏占满宽度并给固定高度 */}
+        <div className="w-full md:flex-1 h-56 md:h-auto flex items-center justify-center relative">
           {/* 店铺背景光晕 */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -76,8 +75,8 @@ export function StreetViewScene({ gameState, supplyDemandResult }: StreetViewSce
           </div>
         </div>
 
-        {/* 右侧：商圈竞争态势 */}
-        <div className="w-72 shrink-0">
+        {/* 右侧：商圈竞争态势；窄屏占满宽度，md 起固定宽 */}
+        <div className="w-full md:w-72 md:shrink-0">
           <CompetitorPanel
             nearbyShops={gameState.nearbyShops || []}
             playerExposure={gameState.exposure}

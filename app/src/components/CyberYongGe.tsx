@@ -10,13 +10,22 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import type { GameState, SupplyDemandResult, HealthAlert } from '@/types/game';
-import { streamChat } from '@/lib/llm/client';
+import {
+  streamChat,
+  getLLMConfig,
+  getByokConfig,
+  setByokConfig,
+  hasByok,
+} from '@/lib/llm/client';
+import type { ByokConfig } from '@/lib/llm/client';
 import { buildMessages, SIMULATE_TOOL } from '@/lib/llm/prompts';
 import type { Proposal } from '@/lib/llm/prompts';
 import { StreamingXMLParser } from '@/lib/llm/xmlParser';
 import type { DiagnosisSection } from '@/lib/llm/xmlParser';
 import { simulateProposals } from '@/lib/llm/simulator';
 import type { SimulationResult } from '@/lib/llm/simulator';
+import { buildRuleAdvice } from '@/lib/llm/ruleAdvisor';
+import { PASSIVE_EXP_CONFIG } from '@/data/cognitionData';
 import {
   MessageCircle,
   Wallet,
@@ -32,6 +41,9 @@ import {
   RotateCcw,
   Flame,
   AlertTriangle,
+  Settings,
+  Sparkles,
+  Cpu,
 } from 'lucide-react';
 
 // ============ 类型 ============
@@ -154,6 +166,11 @@ export function CyberYongGe({
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [toolRound, setToolRound] = useState(0);
+  // 服务端是否配置了作者 key（getLLMConfig 缓存结果）
+  const [serverLLMAvailable, setServerLLMAvailable] = useState(false);
+  // 用户是否接入了自己的 key（BYOK），状态同步到 localStorage
+  const [byokActive, setByokActive] = useState(() => hasByok());
+  const [showSettings, setShowSettings] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const parserRef = useRef(new StreamingXMLParser());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -175,6 +192,25 @@ export function CyberYongGe({
       abortRef.current.abort();
     }
   }, [open]);
+
+  // 打开时探测"真 LLM 是否可用"：服务端作者 key（带缓存） + 本地 BYOK
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getLLMConfig()
+      .then((cfg) => {
+        if (!cancelled) setServerLLMAvailable(!!cfg.available);
+      })
+      .catch(() => {
+        if (!cancelled) setServerLLMAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  // 真 LLM 是否可用 = 服务端配了作者 key || 用户接入了自己的 key
+  const realLLMAvailable = serverLLMAvailable || byokActive;
 
   const canConsult = consultedThisWeek < consultLimit && gameState.cash >= consultCost;
 
@@ -225,8 +261,28 @@ export function CyberYongGe({
     });
   }, [gameState, currentStats]);
 
-  // 开始诊断（单次 streamChat + function calling）
+  /**
+   * 规则版诊断：完全本地、零网络、永不报错。
+   * 直接把 ruleAdvisor 产出的 sections/proposals/simResult 填进现有渲染管线，phase 直接到 done。
+   */
+  const runRuleDiagnosis = useCallback(() => {
+    const advice = buildRuleAdvice(
+      gameState,
+      currentStats,
+      supplyDemandResult,
+      healthAlerts,
+    );
+    setSections(advice.sections);
+    setProposals(advice.proposals);
+    setSimResult(advice.simResult);
+    setToolRound(0);
+    setPhase('done');
+  }, [gameState, currentStats, supplyDemandResult, healthAlerts]);
+
+  // 开始诊断：真 LLM 可用走 streamChat，否则走规则版（零成本、不报错）
   const startDiagnosis = useCallback(async () => {
+    // 扣费策略：诊断必定产出结果（规则版也产出，LLM 失败也兜底到规则版），
+    // 所以扣费是安全的——绝不会出现"扣了币又报错"。先校验次数/余额再扣。
     const ok = onConsult();
     if (!ok) {
       setErrorMsg('余额不足或本周咨询次数已满');
@@ -235,7 +291,6 @@ export function CyberYongGe({
     }
 
     // 重置状态
-    setPhase('streaming');
     setSections([]);
     setProposals([]);
     setSimResult(null);
@@ -246,6 +301,13 @@ export function CyberYongGe({
     toolCallCountRef.current = 0;
     parserRef.current.reset();
 
+    // 真 LLM 不可用 → 直接走规则版，不发任何网络请求、不报 500
+    if (!realLLMAvailable) {
+      runRuleDiagnosis();
+      return;
+    }
+
+    setPhase('streaming');
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -306,10 +368,13 @@ export function CyberYongGe({
       }
     } catch (err: unknown) {
       if ((err as Error).name === 'AbortError') return;
-      setErrorMsg(err instanceof Error ? err.message : '请求失败');
-      setPhase('error');
+      // 真 LLM 路径失败（网络/上游错误/预算耗尽等）→ 兜底到规则版，
+      // 玩家已扣的费照样换来一份有用诊断，绝不"扣了币又报错"。
+      console.warn('[CyberYongGe] AI 勇哥请求失败，降级到规则版:', err);
+      parserRef.current.reset();
+      runRuleDiagnosis();
     }
-  }, [gameState, currentStats, supplyDemandResult, onConsult, healthAlerts, handleToolCall]);
+  }, [gameState, currentStats, supplyDemandResult, onConsult, healthAlerts, handleToolCall, realLLMAvailable, runRuleDiagnosis]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -321,17 +386,56 @@ export function CyberYongGe({
           <SheetTitle className="flex items-center gap-2 text-orange-500">
             <Flame className="w-5 h-5" />
             赛博勇哥 · 连麦诊断
+            {/* 当前模式标注，让用户知情 */}
+            {realLLMAvailable ? (
+              <span className="ml-1 inline-flex items-center gap-1 text-[10px] font-normal px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300">
+                <Sparkles className="w-3 h-3" />
+                AI 勇哥（{byokActive ? '已接入你的key' : '已接入'}）
+              </span>
+            ) : (
+              <span className="ml-1 inline-flex items-center gap-1 text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-300">
+                <Cpu className="w-3 h-3" />
+                规则版勇哥（免费）
+              </span>
+            )}
+            {/* 设置入口：接入我的AI */}
+            <button
+              type="button"
+              onClick={() => setShowSettings((v) => !v)}
+              className="ml-auto p-1 rounded text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+              title="接入我的 AI（自带 key）"
+              aria-label="接入我的 AI"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </SheetTitle>
           <SheetDescription className="text-slate-400 text-xs">
-            {consultCost}元/次 · 本周 {consultedThisWeek}/{consultLimit} 次 · +80认知经验
+            {consultCost}元/次 · 本周 {consultedThisWeek}/{consultLimit} 次 · +
+            {PASSIVE_EXP_CONFIG.consultYongGeExp}认知经验
           </SheetDescription>
         </SheetHeader>
+
+        {/* BYOK 设置面板 */}
+        {showSettings && (
+          <ByokSettings
+            onClose={() => setShowSettings(false)}
+            onSaved={() => {
+              setByokActive(hasByok());
+              setShowSettings(false);
+            }}
+          />
+        )}
 
         {/* 滚动内容区 */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {/* 空闲状态 */}
           {phase === 'idle' && (
-            <IdleView canConsult={canConsult} consultCost={consultCost} onStart={startDiagnosis} />
+            <IdleView
+              canConsult={canConsult}
+              consultCost={consultCost}
+              onStart={startDiagnosis}
+              realLLMAvailable={realLLMAvailable}
+            />
           )}
 
           {/* 诊断步骤卡片 */}
@@ -448,10 +552,12 @@ function IdleView({
   canConsult,
   consultCost,
   onStart,
+  realLLMAvailable,
 }: {
   canConsult: boolean;
   consultCost: number;
   onStart: () => void;
+  realLLMAvailable: boolean;
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 space-y-6">
@@ -463,6 +569,11 @@ function IdleView({
         <p className="text-sm text-slate-400 max-w-xs">
           "来，把手机转一圈，让我看看你这个店的情况"
         </p>
+        {!realLLMAvailable && (
+          <p className="text-[11px] text-slate-500 max-w-xs">
+            当前为规则版勇哥（免费、本地推演，不联网）。想要真 AI 对话？点右上角齿轮接入你自己的 key。
+          </p>
+        )}
       </div>
       <button
         className="ark-button ark-button-primary px-8 py-3 text-base flex items-center gap-2"
@@ -475,6 +586,92 @@ function IdleView({
       {!canConsult && (
         <p className="text-xs text-red-400">余额不足或本周次数已满</p>
       )}
+    </div>
+  );
+}
+
+/** BYOK 设置面板：填自己的 OpenAI 兼容 key / baseURL / model */
+function ByokSettings({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const existing: ByokConfig | null = getByokConfig();
+  const [apiKey, setApiKey] = useState(existing?.apiKey || '');
+  const [baseURL, setBaseURL] = useState(existing?.baseURL || '');
+  const [model, setModel] = useState(existing?.model || '');
+
+  const handleSave = () => {
+    setByokConfig(apiKey.trim() ? { apiKey, baseURL, model } : null);
+    onSaved();
+  };
+
+  const handleClear = () => {
+    setByokConfig(null);
+    setApiKey('');
+    setBaseURL('');
+    setModel('');
+    onSaved();
+  };
+
+  return (
+    <div className="px-5 py-4 border-b border-[#1e293b] bg-[#0a0e14] space-y-3">
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-violet-400" />
+        <span className="text-sm font-bold text-violet-300">接入我的 AI（自带 key）</span>
+      </div>
+      <p className="text-[11px] text-slate-500 leading-relaxed">
+        填你自己的 OpenAI 兼容 key，即可用真 AI 勇哥对话。key 只存在你本地浏览器，
+        通过服务端代理转发（你自付费，不占用免费额度）。留空保存即清除、回到免费规则版。
+      </p>
+      <div className="space-y-2">
+        <input
+          type="password"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder="API Key（sk-...）"
+          className="w-full px-3 py-2 text-xs rounded bg-[#0d1117] border border-[#1e293b] text-slate-200 placeholder:text-slate-600 focus:border-violet-500/50 outline-none"
+          autoComplete="off"
+        />
+        <input
+          type="text"
+          value={baseURL}
+          onChange={(e) => setBaseURL(e.target.value)}
+          placeholder="Base URL（可选，如 https://api.openai.com）"
+          className="w-full px-3 py-2 text-xs rounded bg-[#0d1117] border border-[#1e293b] text-slate-200 placeholder:text-slate-600 focus:border-violet-500/50 outline-none"
+          autoComplete="off"
+        />
+        <input
+          type="text"
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          placeholder="模型名（可选，如 gpt-4o-mini）"
+          className="w-full px-3 py-2 text-xs rounded bg-[#0d1117] border border-[#1e293b] text-slate-200 placeholder:text-slate-600 focus:border-violet-500/50 outline-none"
+          autoComplete="off"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSave}
+          className="flex-1 py-2 text-xs font-bold rounded bg-violet-500/20 border border-violet-500/40 text-violet-300 hover:bg-violet-500/30 transition-colors"
+        >
+          保存并启用
+        </button>
+        <button
+          onClick={handleClear}
+          className="px-3 py-2 text-xs rounded bg-slate-500/10 border border-slate-500/30 text-slate-400 hover:bg-slate-500/20 transition-colors"
+        >
+          清除
+        </button>
+        <button
+          onClick={onClose}
+          className="px-3 py-2 text-xs rounded bg-slate-500/10 border border-slate-500/30 text-slate-400 hover:bg-slate-500/20 transition-colors"
+        >
+          收起
+        </button>
+      </div>
     </div>
   );
 }

@@ -89,8 +89,8 @@ export function GameHeader({
             </div>
           </div>
 
-          {/* 中间：核心财务数据 */}
-          <div className="flex items-center gap-6">
+          {/* 中间：核心财务数据（移动端只保留 现金 + 周利润，其余 hidden md:flex） */}
+          <div className="flex items-center gap-3 md:gap-6">
             <div className="flex items-center gap-2">
               <Wallet className="w-4 h-4 text-orange-500" />
               <div>
@@ -105,7 +105,7 @@ export function GameHeader({
 
             {gameState.gamePhase === "operating" && (
               <>
-                <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
                   <Wallet className="w-4 h-4 text-slate-500" />
                   <div>
                     <p className="text-xs text-slate-400">现金跑道</p>
@@ -122,7 +122,7 @@ export function GameHeader({
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-500" />
                   <div>
                     <p className="text-xs text-slate-400">周收入</p>
@@ -156,7 +156,7 @@ export function GameHeader({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
                   <Star className="w-4 h-4 text-amber-500" />
                   <div>
                     <p className="text-xs text-slate-400">口碑</p>
@@ -176,7 +176,7 @@ export function GameHeader({
               </>
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-500" />
               <div>
                 <p className="text-xs text-slate-400">员工</p>

@@ -356,7 +356,7 @@ export function OperatingPanel({
                             </div>
                             {onToggleProduct && (
                               <button
-                                className="px-2 py-1 text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
+                                className="px-3 py-2 text-xs md:px-2 md:py-1 md:text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
                                 onClick={() => onToggleProduct(product)}
                                 disabled={
                                   gameState.selectedProducts.length <=
@@ -399,7 +399,7 @@ export function OperatingPanel({
                             </div>
                             <div className="flex items-center gap-2">
                               <button
-                                className="w-7 h-7 flex items-center justify-center bg-[#0a0e17] border border-[#1e293b] text-slate-400 hover:bg-[#252f3f] transition-all"
+                                className="h-10 w-10 md:h-7 md:w-7 flex items-center justify-center bg-[#0a0e17] border border-[#1e293b] text-slate-400 hover:bg-[#252f3f] transition-all"
                                 onClick={() =>
                                   onSetProductPrice(
                                     product.id,
@@ -418,7 +418,7 @@ export function OperatingPanel({
                                 </span>
                               </div>
                               <button
-                                className="w-7 h-7 flex items-center justify-center bg-[#0a0e17] border border-[#1e293b] text-slate-400 hover:bg-[#252f3f] transition-all"
+                                className="h-10 w-10 md:h-7 md:w-7 flex items-center justify-center bg-[#0a0e17] border border-[#1e293b] text-slate-400 hover:bg-[#252f3f] transition-all"
                                 onClick={() =>
                                   onSetProductPrice(
                                     product.id,
@@ -669,7 +669,7 @@ export function OperatingPanel({
                               {PROMOTION_TIERS.map((tier, idx) => (
                                 <button
                                   key={tier.id}
-                                  className={`px-1.5 py-0.5 text-[10px] transition-all ${
+                                  className={`px-2.5 py-2 text-xs md:px-1.5 md:py-0.5 md:text-[10px] transition-all ${
                                     activePlatform.promotionTierId === tier.id
                                       ? "bg-blue-500 text-white"
                                       : "bg-[#0a0e17] text-slate-400 border border-[#1e293b] hover:border-blue-500"
@@ -703,7 +703,7 @@ export function OperatingPanel({
                                 return (
                                   <button
                                     key={tier.id}
-                                    className={`px-1.5 py-0.5 text-[10px] transition-all ${
+                                    className={`px-2.5 py-2 text-xs md:px-1.5 md:py-0.5 md:text-[10px] transition-all ${
                                       isActive
                                         ? isLossLeader
                                           ? "bg-red-500 text-white"
@@ -745,7 +745,7 @@ export function OperatingPanel({
                               {DELIVERY_PRICING_TIERS.map((tier) => (
                                 <button
                                   key={tier.id}
-                                  className={`px-1.5 py-0.5 text-[10px] transition-all ${
+                                  className={`px-2.5 py-2 text-xs md:px-1.5 md:py-0.5 md:text-[10px] transition-all ${
                                     activePlatform.deliveryPricingId === tier.id
                                       ? "bg-purple-500 text-white"
                                       : "bg-[#0a0e17] text-slate-400 border border-[#1e293b] hover:border-purple-500"
@@ -781,7 +781,7 @@ export function OperatingPanel({
                               {PACKAGING_TIERS.map((tier) => (
                                 <button
                                   key={tier.id}
-                                  className={`px-1.5 py-0.5 text-[10px] transition-all ${
+                                  className={`px-2.5 py-2 text-xs md:px-1.5 md:py-0.5 md:text-[10px] transition-all ${
                                     activePlatform.packagingTierId === tier.id
                                       ? "bg-amber-500 text-white"
                                       : "bg-[#0a0e17] text-slate-400 border border-[#1e293b] hover:border-amber-500"

@@ -6,11 +6,27 @@ import {
   BarChart3, Megaphone, Package,
   TrendingUp, Utensils, Truck,
   ShieldAlert, ChevronRight, TrendingDown,
+  Rocket, Coins, Wallet, Play,
 } from 'lucide-react';
+import { SCENARIOS } from '@/data/scenarios';
 
 interface WelcomePageProps {
+  /** 滑到底部「开始踩坑」按钮 —— 进入标准 5 步筹备流程 */
   onStart: () => void;
+  /** 「🚀 立即开店」—— 一键默认配置开局，直接进入经营 */
+  onQuickStart: () => void;
+  /** 点剧本卡 —— 套用该剧本蓝图一键开局 */
+  onStartScenario: (scenarioId: string) => void;
 }
+
+// ============ 剧本难度徽章配色 ============
+
+const DIFFICULTY_BADGE: Record<string, { label: string; cls: string }> = {
+  easy: { label: '简单', cls: 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' },
+  medium: { label: '中等', cls: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
+  hard: { label: '困难', cls: 'text-orange-400 border-orange-500/40 bg-orange-500/10' },
+  nightmare: { label: '地狱', cls: 'text-red-400 border-red-500/40 bg-red-500/10' },
+};
 
 // ============ 真实翻车案例 ============
 
@@ -111,7 +127,7 @@ const OPERATING_SYSTEMS = [
 
 // ============ 主组件 ============
 
-export function WelcomePage({ onStart }: WelcomePageProps) {
+export function WelcomePage({ onStart, onQuickStart, onStartScenario }: WelcomePageProps) {
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [glitch, setGlitch] = useState(false);
 
@@ -138,8 +154,16 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
     <div className="min-h-screen bg-[#0a0e17] ark-grid-bg relative overflow-hidden">
       <BackgroundEffects />
 
-      {/* Hero：标题 + 一句话介绍 + 勇哥语录 */}
-      <HeroSection glitch={glitch} quoteIndex={quoteIndex} />
+      {/* Hero：标题 + 一句话介绍 + 勇哥语录 + 30秒看懂 + 立即开店 CTA */}
+      <HeroSection
+        glitch={glitch}
+        quoteIndex={quoteIndex}
+        onQuickStart={onQuickStart}
+        onStart={onStart}
+      />
+
+      {/* R2: 剧本卡墙 —— 点一张卡直接套用蓝图开局（重玩 & 小红书话题入口） */}
+      <ScenarioWall onStartScenario={onStartScenario} />
 
       {/* 翻车案例跑马灯 */}
       <DisasterMarquee />
@@ -188,9 +212,19 @@ function BackgroundEffects() {
 
 // ============ Hero 区域 ============
 
-function HeroSection({ glitch, quoteIndex }: { glitch: boolean; quoteIndex: number }) {
+function HeroSection({
+  glitch,
+  quoteIndex,
+  onQuickStart,
+  onStart,
+}: {
+  glitch: boolean;
+  quoteIndex: number;
+  onQuickStart: () => void;
+  onStart: () => void;
+}) {
   return (
-    <section className="relative flex flex-col items-center justify-center min-h-[85vh] px-4">
+    <section className="relative flex flex-col items-center justify-center min-h-[85vh] px-4 py-12">
       {/* 顶部标签 */}
       <div className="mb-8 flex items-center gap-2">
         <span className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-orange-500 border border-orange-500/30 bg-orange-500/5">
@@ -221,6 +255,50 @@ function HeroSection({ glitch, quoteIndex }: { glitch: boolean; quoteIndex: numb
       </p>
       <p className="text-xs text-slate-600 text-center mb-10">
         灵感来源：网红博主<span className="text-orange-400">「勇哥」</span>的创业避坑连麦系列
+      </p>
+
+      {/* 30 秒看懂：三步说清怎么玩怎么赢 */}
+      <div className="w-full max-w-md mb-6">
+        <div className="ark-card p-5 border-emerald-500/20">
+          <p className="text-xs text-emerald-400/80 mb-3 font-bold tracking-wider uppercase text-center">
+            30 秒看懂
+          </p>
+          <div className="flex items-stretch justify-between gap-2">
+            <div className="flex-1 flex flex-col items-center text-center gap-1.5 p-2">
+              <Coins className="w-6 h-6 text-orange-400" />
+              <p className="text-sm font-bold text-white">约 40 万启动金</p>
+              <p className="text-[11px] text-slate-500 leading-snug">手握本金，准备开店</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-600 self-center shrink-0" />
+            <div className="flex-1 flex flex-col items-center text-center gap-1.5 p-2">
+              <Store className="w-6 h-6 text-cyan-400" />
+              <p className="text-sm font-bold text-white">开店经营</p>
+              <p className="text-[11px] text-slate-500 leading-snug">每周推进，管成本管客流</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-600 self-center shrink-0" />
+            <div className="flex-1 flex flex-col items-center text-center gap-1.5 p-2">
+              <Trophy className="w-6 h-6 text-amber-400" />
+              <p className="text-sm font-bold text-white">回本+连赢 6 周</p>
+              <p className="text-[11px] text-slate-500 leading-snug">达成即胜利</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 大 CTA：立即开店（默认配置一键开局，3 秒进得去） */}
+      <button
+        onClick={onQuickStart}
+        className="
+          ark-button ark-button-primary w-full max-w-md min-h-[44px] py-4 text-lg font-black
+          tracking-wider flex items-center justify-center gap-3 mb-3
+          animate-border-glow hover:scale-[1.02] transition-transform duration-200
+        "
+      >
+        <Rocket className="w-5 h-5" />
+        🚀 立即开店
+      </button>
+      <p className="text-xs text-slate-500 text-center mb-8">
+        一键套用默认配置直接经营 · 也可往下选剧本或<button onClick={onStart} className="text-orange-400 underline underline-offset-2 hover:text-orange-300">手动筹备</button>
       </p>
 
       {/* 勇哥语录轮播 */}
@@ -257,8 +335,79 @@ function HeroSection({ glitch, quoteIndex }: { glitch: boolean; quoteIndex: numb
       </div>
 
       {/* 向下滚动提示 */}
-      <div className="absolute bottom-8 animate-float-bounce">
+      <div className="animate-float-bounce">
         <ChevronDown className="w-6 h-6 text-slate-500" />
+      </div>
+    </section>
+  );
+}
+
+// ============ 剧本卡墙 ============
+
+function ScenarioWall({ onStartScenario }: { onStartScenario: (scenarioId: string) => void }) {
+  return (
+    <section className="py-16 px-4 border-t border-[#1e293b]">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl md:text-3xl font-black text-white mb-2">
+            挑选一个<span className="text-orange-400">真实翻车剧本</span>开局
+          </h2>
+          <p className="text-sm text-slate-500">
+            点一张卡，自动套用配置直接开店 —— 看看你能不能比原型活得更久
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {SCENARIOS.map((sc) => {
+            const badge = DIFFICULTY_BADGE[sc.difficulty] ?? DIFFICULTY_BADGE.medium;
+            return (
+              <button
+                key={sc.id}
+                onClick={() => onStartScenario(sc.id)}
+                className="
+                  ark-card text-left p-5 min-h-[44px] group
+                  border-[#1e293b] hover:border-orange-500/50
+                  hover:translate-y-[-2px] transition-all duration-200
+                "
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="text-base font-bold text-white group-hover:text-orange-300 transition-colors">
+                    {sc.name}
+                  </h3>
+                  <span className={`px-2 py-0.5 text-[10px] font-bold border shrink-0 ${badge.cls}`}>
+                    {badge.label}
+                  </span>
+                </div>
+
+                <p className="text-[12px] text-slate-400 leading-relaxed mb-3 line-clamp-3">
+                  {sc.narrative}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                  {sc.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-1.5 py-0.5 text-[10px] text-slate-400 border border-[#2a3548] bg-[#0a0e17]"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-[#1e293b]">
+                  <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                    <Wallet className="w-3 h-3 text-emerald-500/70" />
+                    起始 ¥{(((sc.initialCash ?? 400000) / 10000)).toFixed(0)}万
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-orange-400 group-hover:gap-2.5 transition-all">
+                    <Play className="w-3.5 h-3.5" />
+                    直接开局
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

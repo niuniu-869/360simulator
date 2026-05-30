@@ -738,6 +738,7 @@ export interface GameState {
   currentWeek: number;
   totalWeeks: number;
   seed?: number; // 本局 RNG seed（可复现）
+  scenarioId?: string | null; // 本局剧本 id（一键开局/剧本卡进入时写入；用于剧本成就与挑战分享链接）
   crisisMode?: "none" | "cash_low" | "rep_crisis" | "bankruptcy_warning";
   consecutiveLossWeeks?: number; // 连亏周数（drama 触发用）
   highlightHistory?: string[]; // 已触发的高光事件 id（去重）

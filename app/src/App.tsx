@@ -36,6 +36,7 @@ import {
   PANEL_UNLOCK_CONFIG,
   PASSIVE_EXP_CONFIG,
 } from "@/data/cognitionData";
+import { persistUnlocked, ACHIEVEMENT_BY_ID } from "@/lib/achievements";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Store,
@@ -52,20 +53,8 @@ import {
   Lock,
 } from "lucide-react";
 
-// Phase 4: 解析 URL ?seed=N 参数（仅在初次加载时执行一次）
-function readSeedFromUrl(): number | undefined {
-  if (typeof window === "undefined") return undefined;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get("seed");
-    if (!raw) return undefined;
-    const n = Number(raw);
-    if (Number.isFinite(n)) return n;
-  } catch {
-    // ignore
-  }
-  return undefined;
-}
+// URL ?seed= / ?scenario= 的解析与"一键开局/复现"已下沉到 useGameState 的 lazy 初始化，
+// App 不再需要在此读取或用副作用启动（避免 react-hooks/set-state-in-effect）。
 
 function App() {
   const {
@@ -93,6 +82,8 @@ function App() {
     openStore,
     nextWeek,
     restart,
+    // R2 一键开局
+    quickStart,
     // 新增方法
     startMarketingActivity,
     stopMarketingActivity,
@@ -122,7 +113,7 @@ function App() {
     isAutoAdvancing,
     speed,
     setSpeed,
-  } = useGameState({ seed: readSeedFromUrl() });
+  } = useGameState();
 
   // Phase 2: 关键事件响应后立即吐 toast（可见决策反馈）
   const respondToEvent = useCallback(
@@ -141,14 +132,44 @@ function App() {
     [gameState.pendingInteractiveEvent, rawRespondToEvent],
   );
 
+  // 欢迎页状态（声明前置：下方一键开局 handler 需引用 setShowWelcome）
+  // 初始是否显示欢迎页：仅当初始局处于 setup（全新开局）时显示；
+  // 若 lazy 初始化已恢复存档或经 URL 一键开局（gamePhase 已是 operating/ended），
+  // 则直接进入游戏（刷新即续上局 / 分享链接落地即玩），不挡欢迎页。
+  const [showWelcome, setShowWelcome] = useState(
+    () => gameState.gamePhase === "setup",
+  );
+
+  // R2: 一键开局（默认配置）—— 欢迎页大 CTA「立即开店」触发
+  const handleQuickStart = useCallback(
+    (scenarioId?: string, seed?: number) => {
+      quickStart(scenarioId, seed);
+      setShowWelcome(false);
+    },
+    [quickStart],
+  );
+
+  // R2: 选某剧本开局 —— 欢迎页剧本卡墙点击触发
+  const handleStartScenario = useCallback(
+    (scenarioId: string) => {
+      quickStart(scenarioId);
+      setShowWelcome(false);
+    },
+    [quickStart],
+  );
+
+  // R2: 结局页"重新开始"回到欢迎页（可再次一键开局/换剧本），而非裸的手动筹备——闭合重玩闭环
+  const handleRestart = useCallback(() => {
+    restart();
+    setShowWelcome(true);
+  }, [restart]);
+
   // 回顾弹窗状态
   const [showReview, setShowReview] = useState(false);
   // Phase 1: 受控 Tab（用于全局快捷键 1/2/3/4 切换）
   const [activeTab, setActiveTab] = useState<string>("operating");
   // 赛博勇哥面板状态
   const [showCyberYongGe, setShowCyberYongGe] = useState(false);
-  // 欢迎页状态
-  const [showWelcome, setShowWelcome] = useState(true);
   // 筹备阶段当前活跃步骤
   const [activeSetupStep, setActiveSetupStep] = useState<string>("brand");
   // 季节选择弹窗状态
@@ -228,6 +249,36 @@ function App() {
     gameState.lastWeeklySummary,
     gameState.weeklySummary,
   ]);
+
+  // R1: 成就即时反馈 — 监听 unlockedAchievements 增量，弹庆祝 toast + 跨局持久化
+  const seenAchievementsRef = useRef<Set<string>>(
+    new Set(gameState.unlockedAchievements ?? []),
+  );
+
+  useEffect(() => {
+    const current = gameState.unlockedAchievements ?? [];
+    const seen = seenAchievementsRef.current;
+    const newIds = current.filter((id) => !seen.has(id));
+    if (newIds.length === 0) return;
+
+    // 跨局持久化
+    persistUnlocked(newIds);
+
+    // 逐个弹庆祝 toast（隐藏成就也照常弹，适合分享）
+    for (const id of newIds) {
+      const ach = ACHIEVEMENT_BY_ID[id];
+      if (!ach) continue;
+      pushToast({
+        message: `🏆 成就达成：${ach.name}`,
+        detail: ach.description,
+        severity: "success",
+        durationMs: 3500,
+      });
+    }
+
+    // 标记为已见，避免重复弹（含 React 严格模式双调用）
+    for (const id of newIds) seen.add(id);
+  }, [gameState.unlockedAchievements]);
 
   // Phase 1: 全局键盘快捷键
   useGlobalShortcuts({
@@ -430,7 +481,11 @@ function App() {
     <>
       <Toaster />
       {showWelcome ? (
-        <WelcomePage onStart={() => setShowWelcome(false)} />
+        <WelcomePage
+          onStart={() => setShowWelcome(false)}
+          onQuickStart={() => handleQuickStart()}
+          onStartScenario={handleStartScenario}
+        />
       ) : (
         <div className="min-h-screen bg-[#0a0e17] ark-grid-bg">
           <GameHeader
@@ -492,7 +547,7 @@ function App() {
                     </span>
                   </div>
 
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex flex-col md:flex-row gap-2 mb-4">
                     {setupSteps.map((step) => {
                       const Icon = step.icon;
                       const isActive = activeSetupStep === step.id;
@@ -500,7 +555,7 @@ function App() {
                         <div
                           key={step.id}
                           className={`
-                        flex-1 p-3 border flex flex-col items-center gap-2 cursor-pointer transition-all duration-200
+                        flex-1 p-3 border flex flex-row md:flex-col items-center gap-2 cursor-pointer transition-all duration-200
                         ${
                           isActive
                             ? "border-orange-500/50 bg-orange-500/10"
@@ -658,7 +713,7 @@ function App() {
                   onValueChange={setActiveTab}
                   className="w-full"
                 >
-                  <TabsList className="w-full flex bg-[#151d2b] border border-[#1e293b] overflow-x-auto">
+                  <TabsList className="w-full flex flex-nowrap bg-[#151d2b] border border-[#1e293b] overflow-x-auto">
                     {/* 已解锁的Tab */}
                     {isPanelUnlocked(
                       "operating",
@@ -666,7 +721,7 @@ function App() {
                     ) && (
                       <TabsTrigger
                         value="operating"
-                        className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                        className="shrink-0 min-w-[68px] md:flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
                       >
                         <Play className="w-4 h-4 mr-1" />
                         经营
@@ -675,7 +730,7 @@ function App() {
                     {isPanelUnlocked("staff", gameState.cognition.level) && (
                       <TabsTrigger
                         value="staff"
-                        className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                        className="shrink-0 min-w-[68px] md:flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
                       >
                         <Users className="w-4 h-4 mr-1" />
                         人员
@@ -687,7 +742,7 @@ function App() {
                     ) && (
                       <TabsTrigger
                         value="inventory"
-                        className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                        className="shrink-0 min-w-[68px] md:flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
                       >
                         <Package className="w-4 h-4 mr-1" />
                         库存
@@ -699,7 +754,7 @@ function App() {
                     ) && (
                       <TabsTrigger
                         value="marketing"
-                        className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                        className="shrink-0 min-w-[68px] md:flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
                       >
                         <Megaphone className="w-4 h-4 mr-1" />
                         营销
@@ -708,7 +763,7 @@ function App() {
                     {isPanelUnlocked("finance", gameState.cognition.level) && (
                       <TabsTrigger
                         value="finance"
-                        className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                        className="shrink-0 min-w-[68px] md:flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
                       >
                         <Calculator className="w-4 h-4 mr-1" />
                         财务
@@ -720,7 +775,7 @@ function App() {
                     ) && (
                       <TabsTrigger
                         value="supplydemand"
-                        className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                        className="shrink-0 min-w-[68px] md:flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white"
                       >
                         <TrendingUp className="w-4 h-4 mr-1" />
                         供需
@@ -763,7 +818,7 @@ function App() {
                       .map((tab) => (
                         <div
                           key={tab.id}
-                          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-slate-600 cursor-not-allowed"
+                          className="shrink-0 min-w-[68px] md:flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-slate-600 cursor-not-allowed"
                           title={`需要认知等级 Lv.${tab.level} 解锁`}
                         >
                           <div className="flex items-center gap-1">
@@ -877,7 +932,7 @@ function App() {
               <GameResult
                 gameState={gameState}
                 result={gameResult}
-                onRestart={restart}
+                onRestart={handleRestart}
               />
             )}
 

@@ -181,6 +181,14 @@ function getWinRoute(params: {
   const profitableNow = params.weeklyProfit > 0 && params.cumulativeProfit >= 0;
   if (!profitableNow) return null;
 
+  // 主胜利：累计利润回本 + 连续盈利达标（不再额外卡曝光/口碑，修复"赚了钱却判负"）
+  if (
+    params.cumulativeProfit >= params.totalInvestment &&
+    params.consecutiveProfits >= WIN_STREAK
+  ) {
+    return "return_on_investment";
+  }
+
   if (
     params.cumulativeProfit >= params.totalInvestment * 1.15 &&
     params.consecutiveProfits >= WIN_STREAK + 2 &&
@@ -563,6 +571,7 @@ export function createInitialGameState(seed?: number): GameState {
     currentWeek: 0,
     totalWeeks: 52,
     seed: usedSeed,
+    scenarioId: null,
     consecutiveProfits: 0,
     gamePhase: "setup",
     gameOverReason: null,
@@ -590,10 +599,11 @@ export function createInitialGameState(seed?: number): GameState {
     cleanliness: 60,
     // v3 增长系统（曝光存量+营销脉冲+口碑置信）
     growthSystem: {
-      launchProgress: 8,
-      awarenessFactor: mapLaunchProgressToAwareness(8),
-      awarenessStock: 12,
-      campaignPulse: 8,
+      // 提高开局起步水位，缩短冷启动空窗（走量改造 R1）
+      launchProgress: 20,
+      awarenessFactor: mapLaunchProgressToAwareness(20),
+      awarenessStock: 26,
+      campaignPulse: 12,
       trustConfidence: 0.12,
       repeatIntent: 45,
     },

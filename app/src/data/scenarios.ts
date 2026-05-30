@@ -144,7 +144,14 @@ export const SCENARIO_BY_ID: Record<string, ScenarioBlueprint> = Object.fromEntr
   SCENARIOS.map((s) => [s.id, s]),
 );
 
-/** 应用一个剧本到 GameState；返回的 state 仍处于 setup 阶段，等调用方依次 dispatch */
+/**
+ * 应用一个剧本到 GameState；返回的 state 仍处于 setup 阶段，等调用方依次 dispatch。
+ *
+ * 注意：本函数只负责套用**初始资金**（initialCash），真正的品牌/选址/选品/员工
+ * 由调用方（useGameState.quickStart）通过真实 action 的 dispatch 序列完成，以走
+ * 完整校验、避免强塞非法 state。GameState 目前没有 scenarioId 字段，故只改 cash，
+ * 其余字段保持原样。保持纯函数（无副作用）。
+ */
 export function applyScenarioToInitialState(state: GameState, scenarioId: string): GameState {
   const sc = SCENARIO_BY_ID[scenarioId];
   if (!sc) return state;

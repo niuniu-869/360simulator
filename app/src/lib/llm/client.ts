@@ -75,6 +75,62 @@ export async function getLLMConfig(): Promise<{ model: string; available: boolea
   return { model: '', available: false };
 }
 
+// ============ BYOK（Bring Your Own Key，自带 key） ============
+// 进阶用户可在前端填自己的 OpenAI 兼容 key，用真 AI 勇哥，作者零成本。
+// key 仅存浏览器 localStorage，通过 server 代理转发（避免浏览器直连的 CORS 问题）。
+// 这类请求由 server 用【用户的 key】转发，不计作者预算、不受 loopback 限制。
+
+const BYOK_STORAGE_KEY = '360sim:byok';
+
+export interface ByokConfig {
+  apiKey: string;
+  baseURL: string; // 可空 → server 用默认上游
+  model: string; // 可空 → server 用默认模型
+}
+
+/** 读取 BYOK 配置。无配置或 apiKey 为空时返回 null。 */
+export function getByokConfig(): ByokConfig | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(BYOK_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ByokConfig>;
+    const apiKey = (parsed.apiKey || '').trim();
+    if (!apiKey) return null;
+    return {
+      apiKey,
+      baseURL: (parsed.baseURL || '').trim(),
+      model: (parsed.model || '').trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 写入 BYOK 配置。传入 null 或空 apiKey 则清除。 */
+export function setByokConfig(config: ByokConfig | null): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    if (!config || !config.apiKey.trim()) {
+      localStorage.removeItem(BYOK_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      BYOK_STORAGE_KEY,
+      JSON.stringify({
+        apiKey: config.apiKey.trim(),
+        baseURL: (config.baseURL || '').trim(),
+        model: (config.model || '').trim(),
+      }),
+    );
+  } catch { /* localStorage 不可用，静默 */ }
+}
+
+/** 是否已接入 BYOK */
+export function hasByok(): boolean {
+  return getByokConfig() !== null;
+}
+
 // ============ 核心请求 ============
 
 /** 单次流式请求（通过 BFF 代理，无需密钥），返回 { content, toolCalls } */
@@ -89,9 +145,19 @@ async function singleStreamRequest(
     body.tools = tools;
   }
 
+  // BYOK：若用户填了自己的 key，通过自定义 header 传给 server，由 server 用用户 key 转发。
+  // 不直接在前端 fetch 上游，避免 CORS；也让作者服务端的预算/限速不被这类自付请求计入。
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const byok = getByokConfig();
+  if (byok) {
+    headers['X-BYOK-Key'] = byok.apiKey;
+    if (byok.baseURL) headers['X-BYOK-Base-URL'] = byok.baseURL;
+    if (byok.model) headers['X-BYOK-Model'] = byok.model;
+  }
+
   const response = await fetch(LLM_PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
     signal,
   });

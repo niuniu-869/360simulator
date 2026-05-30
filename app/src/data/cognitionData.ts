@@ -222,14 +222,15 @@ export const INFO_FUZZ_CONFIG: InfoFuzzConfig[] = [
     ],
   },
   {
+    // 走量改造 R1：核心会计概念前移到 Lv1，Lv0 给模糊值建立教学存在感
     infoType: 'grossMargin',
-    unlockLevel: 3,
+    unlockLevel: 1,
     fuzzLevels: [
-      { level: 0, type: 'hidden' },
-      { level: 1, type: 'hidden' },
-      { level: 2, type: 'hidden' },
-      { level: 3, type: 'range', minRatio: 0.7, maxRatio: 1.3 },
-      { level: 4, type: 'range', minRatio: 0.9, maxRatio: 1.1 },
+      { level: 0, type: 'fuzzy', fuzzyWords: ['毛利薄', '一般', '挺赚'] },
+      { level: 1, type: 'range', minRatio: 0.7, maxRatio: 1.3 },
+      { level: 2, type: 'range', minRatio: 0.8, maxRatio: 1.2 },
+      { level: 3, type: 'range', minRatio: 0.9, maxRatio: 1.1 },
+      { level: 4, type: 'range', minRatio: 0.95, maxRatio: 1.05 },
       { level: 5, type: 'exact' },
     ],
   },
@@ -246,25 +247,27 @@ export const INFO_FUZZ_CONFIG: InfoFuzzConfig[] = [
     ],
   },
   {
+    // 走量改造 R1：核心会计概念前移到 Lv1，Lv0 给模糊值建立教学存在感
     infoType: 'variableCost',
-    unlockLevel: 2,
+    unlockLevel: 1,
     fuzzLevels: [
-      { level: 0, type: 'hidden' },
-      { level: 1, type: 'fuzzy', fuzzyWords: ['挺高的', '不少'] },
-      { level: 2, type: 'range', minRatio: 0.7, maxRatio: 1.3 },
+      { level: 0, type: 'fuzzy', fuzzyWords: ['挺高的', '不少'] },
+      { level: 1, type: 'range', minRatio: 0.7, maxRatio: 1.3 },
+      { level: 2, type: 'range', minRatio: 0.8, maxRatio: 1.2 },
       { level: 3, type: 'exact' },
       { level: 4, type: 'exact' },
       { level: 5, type: 'exact' },
     ],
   },
   {
+    // 走量改造 R1：核心会计概念前移到 Lv1，Lv0 给模糊值建立教学存在感
     infoType: 'fixedCost',
-    unlockLevel: 2,
+    unlockLevel: 1,
     fuzzLevels: [
-      { level: 0, type: 'hidden' },
-      { level: 1, type: 'hidden' },
-      { level: 2, type: 'fuzzy', fuzzyWords: ['不少钱', '大头'] },
-      { level: 3, type: 'range', minRatio: 0.8, maxRatio: 1.2 },
+      { level: 0, type: 'fuzzy', fuzzyWords: ['不少钱', '大头'] },
+      { level: 1, type: 'range', minRatio: 0.8, maxRatio: 1.2 },
+      { level: 2, type: 'range', minRatio: 0.8, maxRatio: 1.2 },
+      { level: 3, type: 'range', minRatio: 0.9, maxRatio: 1.1 },
       { level: 4, type: 'exact' },
       { level: 5, type: 'exact' },
     ],
